@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2B3A67">
+  <title>Autour d'un Verre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="offline" class="offline-banner hidden">Connexion perdue… reconnexion en cours</div>
+  <div class="app">
+    <header class="topbar" id="topbar">
+      <div class="brand"><span id="brandSprig"></span><span id="brandTitle">Autour d'un Verre</span></div>
+      <div class="who" id="who"></div>
+    </header>
+    <main id="screen"></main>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared.js"></script>
+  <script src="/common.js"></script>
+  <script src="/guest.js"></script>
+</body>
+</html>
