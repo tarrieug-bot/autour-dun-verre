@@ -1,6 +1,6 @@
 /* Console animateur */
 (function () {
-  const { esc, sprig, stamp, toast, store } = window.UI;
+  const { esc, sprig, stamp, toast, store, applyTheme } = window.UI;
   const PW_KEY = 'adv_host_pw';
   const PHASE_LABELS = {
     LOBBY: 'Accueil', BODY_COUNT: 'Body Count', CLASSEMENT: 'Classement', BOUTEILLE_1: 'Mot Interdit',
@@ -82,7 +82,8 @@
   /* ---------------- Rendu ---------------- */
   function render() {
     if (!authed || !H) return;
-    $('evTitle').textContent = H.event.title + ' · ' + H.event.date;
+    applyTheme(H.event);
+    $('evTitle').textContent = [H.event.subtitle, H.event.date].filter(Boolean).join(' · ');
     document.title = 'Console · ' + H.event.title;
 
     $('stepper').innerHTML = H.phases.map((p, i) =>
@@ -128,13 +129,23 @@
         '<p class="muted" style="font-size:.85rem">Les lecteurs des affirmations seront répartis entre les invités présents au démarrage.</p>' +
         '<button class="btn block red" id="start">Démarrer le Body Count</button></div></div>' +
         '<form class="card" id="ev"><div class="label gold">Événement</div><div class="grid2">' +
-        '<label class="field"><span class="label">Titre</span><input class="input" id="title"></label>' +
-        '<label class="field"><span class="label">Date (tampon)</span><input class="input" id="date"></label></div>' +
+        '<label class="field"><span class="label">Thème visuel</span><select class="input" id="theme"><option value="whisky">Whisky · ambre rouge</option><option value="champagne">Champagne · or</option></select></label>' +
+        '<label class="field"><span class="label">Sous-titre</span><input class="input" id="subtitle" placeholder="De whisky avec Aikan"></label>' +
+        '<label class="field"><span class="label">Date</span><input class="input" id="date" placeholder="26.11.2026"></label>' +
+        '<label class="field"><span class="label">Lieu</span><input class="input" id="place"></label>' +
+        '<label class="field"><span class="label">Organisateurs</span><input class="input" id="orga"></label>' +
+        '<label class="field"><span class="label">Nom de l’événement (onglet)</span><input class="input" id="title"></label></div>' +
         '<button class="btn small" type="submit">Enregistrer</button></form>';
       const q = (id) => root.querySelector('#' + id);
-      q('title').value = h.event.title;
-      q('date').value = h.event.date;
-      q('ev').onsubmit = (e) => { e.preventDefault(); act('configEvent', { title: q('title').value, date: q('date').value }).then((r) => r.ok && toast('Enregistré')); };
+      ['title', 'date', 'subtitle', 'place', 'orga', 'theme'].forEach((k) => { q(k).value = h.event[k] || ''; });
+      q('theme').value = h.event.theme || 'whisky';
+      q('theme').onchange = () => applyTheme({ theme: q('theme').value });
+      q('ev').onsubmit = (e) => {
+        e.preventDefault();
+        const data = {};
+        ['title', 'date', 'subtitle', 'place', 'orga', 'theme'].forEach((k) => { data[k] = q(k).value; });
+        act('configEvent', data).then((r) => r.ok && toast('Enregistré — visible chez les invités'));
+      };
       q('start').onclick = () => act('startBody');
       return { update(h) { q('n').textContent = h.players.length; } };
     },
@@ -181,14 +192,14 @@
       q('go').onclick = () => act('setPhase', { phase: 'BOUTEILLE_1' });
       return {
         update(h) {
-          const tc = (k) => h.teams.find((t) => t.key === k) || { name: '—', color: '#999' };
+          const tc = (k) => h.teams.find((t) => t.key === k) || { name: '—', color: 'transparent' };
           const rk = h.ranking || [];
           q('tbl').innerHTML = '<tr><th class="label">#</th><th class="label">Invité</th><th class="label">Score</th><th class="label">Équipe</th></tr>' +
             rk.map((r) => '<tr><td>' + r.rank + '</td><td><strong>' + esc(r.pseudo) + '</strong> · <em class="serif">' + esc(r.word) + '</em></td><td>' + r.score + '</td>' +
               '<td><span class="team-badge" style="background:' + tc(r.team).color + '">' + esc(tc(r.team).name) + '</span></td></tr>').join('');
           q('teams').innerHTML = h.teams.map((t) => {
             const m = h.players.filter((p) => p.team === t.key);
-            return '<div class="card team-card" style="background:' + t.color + '"><div class="label">' + m.length + ' membres</div><h3 style="color:var(--ivoire)">' + esc(t.name) + '</h3>' +
+            return '<div class="card team-card" style="background:' + t.color + '"><div class="label">' + m.length + ' membres</div><h3>' + esc(t.name) + '</h3>' +
               '<ul class="mates">' + m.map((p) => '<li>' + esc(p.pseudo) + '</li>').join('') + '</ul></div>';
           }).join('');
         },

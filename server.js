@@ -8,7 +8,9 @@ const QRCode = require('qrcode');
 const { Server } = require('socket.io');
 // Les fichiers du site peuvent être dans ./public ou à la racine (dépôt « à plat »)
 const PUB = fs.existsSync(path.join(__dirname, 'public', 'index.html')) ? path.join(__dirname, 'public') : __dirname;
-const STATIC_FILES = ['index.html', 'host.html', 'style.css', 'common.js', 'shared.js', 'guest.js', 'host.js'];
+const STATIC_FILES = ['index.html', 'host.html', 'style.css', 'common.js', 'shared.js', 'guest.js', 'host.js',
+  'logo.png', 'bodoni.woff2', 'bodoni-italic.woff2', 'josefin-300.woff2', 'josefin-400.woff2', 'josefin-600.woff2',
+  'band-whisky.jpg', 'band-champagne.jpg', 'bg-whisky.jpg', 'bg-champagne.jpg'];
 const { findForbidden } = require(path.join(PUB, 'shared.js'));
 
 const PORT = process.env.PORT || 3000;
@@ -40,9 +42,9 @@ const STATEMENTS = [
 ];
 
 const TEAMS = [
-  { key: 'epicurieux', name: 'Les Épicurieux', color: '#9A3B34' },
-  { key: 'amateurs', name: 'Les Amateurs Éclairés', color: '#B8923E' },
-  { key: 'sages', name: 'Les Sages du Bar', color: '#2B3A67' },
+  { key: 'epicurieux', name: 'Les Épicurieux', color: 'var(--team-1)' },
+  { key: 'amateurs', name: 'Les Amateurs Éclairés', color: 'var(--team-2)' },
+  { key: 'sages', name: 'Les Sages du Bar', color: 'var(--team-3)' },
 ];
 
 const DEFAULT_FORBIDDEN = ['bon', 'fort', 'sucré', 'sympa', 'bien'];
@@ -66,7 +68,14 @@ function freshState() {
   return {
     sessionId: crypto.randomUUID(),
     phase: 'LOBBY',
-    event: { title: "Autour d'un Verre", date: todayStamp() },
+    event: {
+      title: "Autour d'un Verre",
+      date: todayStamp(),
+      theme: 'whisky',
+      subtitle: 'De whisky avec Aikan',
+      place: "Au CIS, Étang Z'Abricot",
+      orga: 'So Greyg & le CIS Martinique',
+    },
     players: new Map(),
     joinCounter: 0,
     body: { started: false, index: 0, readers: [] },
@@ -610,6 +619,10 @@ function hostAction(a) {
     case 'configEvent':
       state.event.title = clean(a.title, 60) || "Autour d'un Verre";
       state.event.date = clean(a.date, 20) || todayStamp();
+      state.event.theme = a.theme === 'champagne' ? 'champagne' : 'whisky';
+      state.event.subtitle = clean(a.subtitle, 60);
+      state.event.place = clean(a.place, 80);
+      state.event.orga = clean(a.orga, 80);
       return;
     case 'configB1': {
       state.b1.bottle = clean(a.bottle, 60);
@@ -719,7 +732,7 @@ app.get('/img/:id', (req, res) => {
 });
 app.get('/qr.svg', async (req, res) => {
   const base = process.env.PUBLIC_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
-  const svg = await QRCode.toString(base + '/', { type: 'svg', margin: 1, color: { dark: '#2B3A67', light: '#F4F1E8' } });
+  const svg = await QRCode.toString(base + '/', { type: 'svg', margin: 1, color: { dark: '#120604', light: '#FDFCF1' } });
   res.set('Content-Type', 'image/svg+xml').send(svg);
 });
 app.get('/:file', (req, res, next) => {

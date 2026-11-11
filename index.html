@@ -3,21 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2B3A67">
+  <meta name="theme-color" content="#120604">
   <title>Autour d'un Verre</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="/logo.png">
+  <link rel="preload" href="/bodoni.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body data-theme="whisky">
   <div id="offline" class="offline-banner hidden">Connexion perdue… reconnexion en cours</div>
   <div class="app">
     <header class="topbar" id="topbar">
-      <div class="brand"><span id="brandSprig"></span><span id="brandTitle">Autour d'un Verre</span></div>
+      <div class="brand"><img src="/logo.png" alt="Autour d'un Verre" id="brandLogo"></div>
       <div class="who" id="who"></div>
     </header>
-    <main id="screen"></main>
+    <main id="screen"><div class="waiting" style="margin-top:30vh">Connexion à la table<span class="dots"><span>.</span><span>.</span><span>.</span></span></div><p class="center muted" style="font-size:.8rem">Si c’est long, patiente quelques secondes : le serveur se réveille.</p></main>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared.js"></script>

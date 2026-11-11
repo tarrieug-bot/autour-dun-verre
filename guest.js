@@ -1,6 +1,6 @@
 /* Vue invité */
 (function () {
-  const { esc, sprig, stamp, toast, uuid, store } = window.UI;
+  const { esc, sprig, stamp, toast, uuid, store, applyTheme } = window.UI;
 
   // ?slot=2 permet d'ouvrir plusieurs invités de test dans le même navigateur
   const slot = new URLSearchParams(location.search).get('slot');
@@ -10,7 +10,6 @@
 
   const $screen = document.getElementById('screen');
   const $who = document.getElementById('who');
-  document.getElementById('brandSprig').innerHTML = sprig();
 
   const socket = io({ transports: ['websocket', 'polling'] });
   let S = null; // dernier état reçu
@@ -52,7 +51,7 @@
 
   function render() {
     document.title = S.event.title;
-    document.getElementById('brandTitle').textContent = S.event.title;
+    applyTheme(S.event);
     updateWho();
     let key;
     if (!S.me) key = 'JOIN';
@@ -61,6 +60,9 @@
     else key = S.phase;
     if (key !== mountedKey) {
       mountedKey = key;
+      document.body.classList.toggle('has-hero', key === 'JOIN' || key === 'LOBBY');
+      const t = document.querySelector('.toast');
+      if (t) t.classList.remove('show');
       const factory = key === 'JOIN' ? Screens.JOIN : Screens[S.phase];
       $screen.innerHTML = '';
       screen = factory($screen, S) || {};
@@ -69,6 +71,14 @@
     if (screen.update) screen.update(S);
   }
 
+  const hero = (s) =>
+    '<section class="hero"><div class="hero-band"></div>' +
+    '<img class="hero-logo" src="/logo.png" alt="' + esc(s.event.title) + '">' +
+    (s.event.subtitle ? '<div class="sub glow">' + esc(s.event.subtitle) + '</div>' : '') +
+    '<div class="meta">' + [s.event.date, s.event.place].filter(Boolean).map(esc).join(' · ') + '</div>' +
+    (s.event.orga ? '<div class="orga" style="margin-top:14px">' + esc(s.event.orga) + ' <em>vous font vivre</em></div>' : '') +
+    '</section>';
+
   const head = (label, title, sub) =>
     '<div class="phase-head"><span class="label gold">' + label + '</span><h2>' + title + '</h2>' + (sub ? '<div class="muted" style="margin-top:6px">' + sub + '</div>' : '') + '</div>';
 
@@ -76,11 +86,9 @@
     /* ---------------- Rejoindre ---------------- */
     JOIN(root, s) {
       root.innerHTML =
-        '<section class="hero"><span class="label">Carnet de dégustation</span>' +
-        '<h1 style="margin-top:10px">' + esc(s.event.title) + '</h1>' +
-        '<div class="ornament">' + sprig() + '</div></section>' +
-        '<div class="stamp-wrap">' + stamp(s.event.date, 'bienvenue') + '</div>' +
-        '<form class="card" id="joinForm" autocomplete="off">' +
+        hero(s) +
+        '<form class="card" id="joinForm" autocomplete="off" style="margin-top:26px">' +
+        '<div class="label gold center" style="margin-bottom:4px">Rejoins la table</div>' +
         '<label class="field"><span class="label">Ton pseudo</span><input class="input" id="pseudo" maxlength="24" required placeholder="ex. Doudou"></label>' +
         '<label class="field"><span class="label">Un mot qui te décrit</span><input class="input" id="word" maxlength="24" required placeholder="ex. curieuse"></label>' +
         '<button class="btn block" type="submit">Rejoindre la table</button>' +
@@ -105,10 +113,11 @@
     /* ---------------- Lobby ---------------- */
     LOBBY(root, s) {
       root.innerHTML =
-        '<section class="hero"><span class="label">Bienvenue à la table</span>' +
-        '<h1 style="margin-top:10px">' + esc(s.me.pseudo) + '</h1>' +
-        '<div class="serif" style="font-style:italic;font-size:1.3rem;color:var(--rouge)">« ' + esc(s.me.word) + ' »</div></section>' +
-        '<div class="stamp-wrap">' + stamp(s.event.date, 'à table') + '</div>' +
+        hero(s) +
+        '<div class="center" style="margin-top:28px"><span class="label">Bienvenue à la table</span>' +
+        '<h1 style="margin-top:8px;font-style:italic">' + esc(s.me.pseudo) + '</h1>' +
+        '<div class="serif" style="font-style:italic;font-size:1.25rem;color:var(--accent-2)">« ' + esc(s.me.word) + ' »</div></div>' +
+        '<div class="ornament">' + sprig() + '</div>' +
         '<div class="waiting">L’animateur va bientôt lancer la soirée<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>' +
         '<div class="ornament">' + sprig() + '</div>' +
         '<div class="label" id="count"></div><div class="chips" id="guests" style="margin-top:10px"></div>';
@@ -361,7 +370,9 @@
       root.innerHTML =
         '<p class="center label" style="margin-bottom:10px">Ta fiche-souvenir · fais une capture d’écran</p>' +
         '<article class="recap">' +
-        '<div class="recap-head"><span class="label">' + esc(s.event.title) + ' · ' + esc(s.event.date) + '</span>' +
+        '<div class="recap-head"><div class="band"></div><img class="logo" src="/logo.png" alt="">' +
+        (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
+        '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-team" style="background:' + t.color + '"><span>' + esc(t.name) + '</span><span class="label">équipe</span></div>' : '') +
         sec('Body Count', r.score === null ? none : r.score + ' « oui » <small>' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
@@ -369,7 +380,7 @@
         sec('Le Match', voteTxt) +
         '<div class="recap-sec"><div class="label">Le Juste Prix</div><div style="margin-top:4px">' + paris + '</div></div>' +
         sec('Mon mot de la soirée', r.closing ? '« ' + esc(r.closing) + ' »' : none) +
-        '<div class="recap-foot">' + sprig() + '<span class="label">Martinique<br>' + esc(s.event.date) + '</span></div>' +
+        '<div class="recap-foot">' + sprig() + '<span class="label">' + (s.event.place ? esc(s.event.place.split('·')[0].trim()) + '<br>' : '') + 'Martinique</span></div>' +
         '</article>';
     },
   };

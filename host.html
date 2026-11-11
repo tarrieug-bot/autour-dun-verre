@@ -5,56 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Console animateur · Autour d'un Verre</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="/logo.png">
+  <link rel="preload" href="/bodoni.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
   <style>
     .host { max-width: 1280px; margin: 0 auto; padding: 0 22px 60px; }
     .host-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0 12px; border-bottom: 1px solid var(--or); flex-wrap: wrap; }
     .host-top h1 { font-size: 2rem; }
     .stepper { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 20px; }
-    .stepper button { border: 1px solid rgba(43,58,103,.45); background: rgba(255,255,255,.5); padding: 8px 12px; font-family: var(--mono); font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; border-radius: 3px; color: var(--indigo); }
+    .stepper button { border: 1px solid rgba(43,58,103,.45); background: var(--glass); padding: 9px 13px 7px; font-family: var(--sans); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; border-radius: 3px; color: var(--cream); border-color: var(--line); }
     .stepper button .n { color: var(--or); margin-right: 4px; }
-    .stepper button.active { background: var(--indigo); color: var(--ivoire); border-color: var(--indigo); }
+    .stepper button.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--bg); border-color: var(--accent); box-shadow: 0 0 18px -6px var(--accent); }
+    .stepper button.active .n { color: var(--bg) !important; }
     .stepper button.active .n { color: var(--or); }
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
     @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
     .side .card { margin-top: 0; }
     .plist { list-style: none; margin: 8px 0 0; padding: 0; max-height: 46vh; overflow: auto; }
-    .plist li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dotted rgba(59,42,30,.25); font-size: .88rem; }
+    .plist li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(253,252,241,.08); font-size: .88rem; }
     .plist li .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .plist li em { font-family: var(--serif); color: var(--rouge); }
     .plist .x { border: 0; background: none; cursor: pointer; color: var(--encre-soft); font-size: 1rem; padding: 0 4px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #c9bfae; flex: none; }
-    .dot.on { background: #5c7a4e; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(253,252,241,.2); flex: none; }
+    .dot.on { background: #8FD18B; box-shadow: 0 0 6px #8FD18B; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
     table.rank { width: 100%; border-collapse: collapse; font-size: .9rem; }
     table.rank th { text-align: left; font-weight: 400; }
-    table.rank td, table.rank th { padding: 7px 6px; border-bottom: 1px dotted rgba(59,42,30,.25); }
+    table.rank td, table.rank th { padding: 7px 6px; border-bottom: 1px solid rgba(253,252,241,.08); }
     .names { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .names span { border: 1px solid rgba(59,42,30,.3); padding: 3px 9px; border-radius: 20px; font-size: .82rem; background: #fffdf7; }
-    .names.yes span { border-color: var(--rouge); color: var(--rouge); }
+    .names span { border: 1px solid var(--line); padding: 4px 10px 2px; border-radius: 20px; font-size: .82rem; background: var(--glass); }
+    .names.yes span { border-color: var(--accent); color: var(--accent-2); }
     .names.empty { color: var(--encre-soft); font-size: .82rem; }
-    .host-exclusive { border: 1.5px dashed var(--rouge); }
+    .host-exclusive { border: 1px dashed var(--accent); }
     .host-exclusive > .label:first-child { color: var(--rouge); }
-    .qr { width: 210px; height: 210px; border: 1px solid var(--or); padding: 6px; background: var(--ivoire); }
-    .url { font-size: 1.1rem; font-weight: 700; color: var(--indigo); word-break: break-all; }
-    .opt-radio { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid rgba(43,58,103,.35); border-radius: 3px; margin-top: 8px; cursor: pointer; background: rgba(255,255,255,.5); }
-    .opt-radio input { width: 20px; height: 20px; accent-color: var(--rouge); }
+    .qr { width: 220px; height: 220px; border: 1px solid var(--gold); padding: 8px; background: #FDFCF1; border-radius: 3px; }
+    .url { font-size: 1.05rem; letter-spacing: .06em; color: var(--accent-2); word-break: break-all; }
+    .opt-radio { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 3px; margin-top: 8px; cursor: pointer; background: var(--glass); }
+    .opt-radio input { width: 20px; height: 20px; accent-color: var(--accent); }
     .round-hist { display: flex; flex-wrap: wrap; gap: 6px; }
     .badge { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; border: 1px solid; }
     .login { max-width: 420px; margin: 10vh auto; padding: 0 18px; }
     .img-prev { max-height: 90px; border: 1px solid var(--or); margin-top: 8px; display: block; }
-    .bigstat { font-family: var(--serif); font-style: italic; font-size: 3rem; color: var(--indigo); line-height: 1; }
+    .bigstat { font-family: var(--serif); font-size: 3.4rem; color: var(--cream); line-height: 1; }
+    .host-logo { height: 52px; display: block; }
   </style>
 </head>
-<body>
+<body data-theme="whisky">
   <div id="offline" class="offline-banner hidden">Connexion au serveur perdue… reconnexion</div>
 
   <section class="login" id="login">
-    <div class="center"><span class="label">Console animateur</span><h1 style="margin-top:8px">Autour d'un Verre</h1></div>
+    <div class="center"><img src="/logo.png" alt="Autour d'un Verre" style="width:260px;margin:0 auto 12px;display:block"><span class="label gold">Console animateur</span></div>
     <div class="stamp-wrap" id="loginStamp"></div>
     <form class="card" id="loginForm">
       <label class="field"><span class="label">Mot de passe animateur</span><input class="input" type="password" id="pw" autocomplete="current-password" required></label>
@@ -65,7 +66,7 @@
 
   <div class="host hidden" id="app">
     <header class="host-top">
-      <div><span class="label gold">Console animateur</span><h1 id="evTitle"></h1></div>
+      <div style="display:flex;align-items:center;gap:18px"><img class="host-logo" src="/logo.png" alt=""><div><span class="label gold">Console animateur</span><div class="label" id="evTitle" style="margin-top:4px"></div></div></div>
       <div class="btn-row" style="flex:0 0 auto">
         <a class="btn ghost small" href="/" target="_blank" rel="noopener">Vue invité ↗</a>
         <button class="btn red small" id="resetBtn">Nouvelle session</button>
