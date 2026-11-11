@@ -152,6 +152,7 @@
           q('prepSum').innerHTML = '<div class="label gold">Préparation</div>' +
             '<p style="margin:8px 0 4px">' + esc(h.event.subtitle || '') + ' · ' + esc(h.event.date) + ' · thème ' + (h.event.theme === 'champagne' ? 'Champagne' : 'Whisky') + '</p>' +
             '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' pari(s) préparé(s) · Body Count : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
+            '<div style="margin:-4px 0 12px;font-size:.82rem">' + cloudLine(h) + '</div>' +
             '<button class="btn small ghost" id="goPrep">Ouvrir la préparation</button>';
           q('goPrep').onclick = () => { prepMode = true; mountedKey = null; render(); };
         },
@@ -459,6 +460,7 @@
         '<div class="card" style="position:sticky;bottom:10px;z-index:5;background:var(--bg-2);display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
         '<button class="btn" id="save">Enregistrer la préparation</button>' +
         '<span class="muted" id="saveState" style="flex:1;font-size:.85rem">' + (draft.updatedAt ? 'Dernier enregistrement : ' + new Date(draft.updatedAt).toLocaleString('fr-FR') : 'Pas encore enregistrée') + '</span>' +
+        '<span id="cloudState" style="font-size:.8rem;width:100%;order:9"></span>' +
         '<button class="btn small ghost" id="exp">Exporter</button><label class="btn small ghost" style="cursor:pointer">Importer<input type="file" accept="application/json,.json" id="imp" hidden></label></div>';
 
       const q = (sel) => root.querySelector(sel);
@@ -572,8 +574,16 @@
         toast('Préparation enregistrée ✓');
       }
     }
-    return {};
+    return { update(h) { const el = root.querySelector('#cloudState'); if (el) el.innerHTML = cloudLine(h); } };
   };
+
+  function cloudLine(h) {
+    const c = h.config.cloud || {};
+    if (!c.enabled) return '<span style="color:var(--danger)">Sauvegarde permanente non activée</span> <span class="muted">— la préparation n’est gardée que sur ce serveur et dans ce navigateur.</span>';
+    if (c.ok === false) return '<span style="color:var(--danger)">Sauvegarde permanente en erreur : ' + esc(c.error || '') + '</span>';
+    if (c.synced) return '<span style="color:#8FD18B">● Sauvegarde permanente à jour (GitHub)</span>' + (c.savedAt ? ' <span class="muted">· ' + new Date(c.savedAt).toLocaleTimeString('fr-FR') + '</span>' : '');
+    return '<span class="muted">● Sauvegarde permanente activée (GitHub) — envoi en cours ou en attente du prochain enregistrement…</span>';
+  }
 
   /* Redimensionne une photo côté navigateur avant envoi */
   function resizeImage(file, max, quality) {

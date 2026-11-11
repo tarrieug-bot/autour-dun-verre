@@ -36,6 +36,12 @@ automatiquement. « Exporter / Importer » permet de la passer d'un appareil à 
 
 Body Count : 1 affirmation par invité présent au démarrage (chacun ne lit qu'une fois).
 
+## Sauvegarde permanente (GitHub)
+
+Variable d'environnement Render `GITHUB_TOKEN` = une clé GitHub « classic » avec le seul droit **gist**.
+La préparation est alors copiée dans un gist **secret** de ton compte à chaque enregistrement,
+et rechargée automatiquement au réveil du serveur. L'état s'affiche dans la console (Accueil et Préparation).
+
 ## Mise à jour du site
 
 Après un changement de code sur GitHub : Render → service `autour-dun-verre` → **Manual Deploy → Deploy latest commit**.

@@ -124,12 +124,98 @@ function loadConfigFromDisk() {
 }
 let saveTimer = null;
 function saveConfigToDisk() {
+  cloudSave();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(CONFIG_FILE, JSON.stringify(state.config)); } catch (e) { /* disque indisponible */ }
   }, 300);
 }
 function touchConfig() { state.config.updatedAt = Date.now(); saveConfigToDisk(); }
+
+/* ------------------------------------------------------------------ */
+/* Sauvegarde permanente : gist secret GitHub (si GITHUB_TOKEN défini)  */
+/* ------------------------------------------------------------------ */
+const GH_TOKEN = process.env.GITHUB_TOKEN || '';
+const GH_API = process.env.GITHUB_API || 'https://api.github.com';
+const GIST_DESC = "Autour d'un Verre · préparation de soirée (sauvegarde automatique, ne pas supprimer)";
+const GIST_FILE = 'preparation-autour-dun-verre.json';
+const cloud = { enabled: !!GH_TOKEN, ok: null, savedAt: null, loadedAt: null, error: null, gistId: process.env.GIST_ID || null };
+
+async function gh(method, url, body) {
+  const res = await fetch(url.startsWith('http') ? url : GH_API + url, {
+    method,
+    headers: {
+      Authorization: 'Bearer ' + GH_TOKEN,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'autour-dun-verre',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error('GitHub ' + res.status + (res.status === 401 ? ' (clé GITHUB_TOKEN invalide ou expirée)' : res.status === 403 || res.status === 404 ? ' (la clé doit avoir le droit « gist »)' : ''));
+  return res.status === 204 ? null : res.json();
+}
+
+async function findGistId() {
+  if (cloud.gistId) return cloud.gistId;
+  for (let page = 1; page <= 5; page++) {
+    const list = await gh('GET', '/gists?per_page=100&page=' + page);
+    const hit = list.find((g) => g.description === GIST_DESC || (g.files && g.files[GIST_FILE]));
+    if (hit) return (cloud.gistId = hit.id);
+    if (list.length < 100) break;
+  }
+  return null;
+}
+
+async function cloudLoad() {
+  if (!cloud.enabled) return;
+  try {
+    const id = await findGistId();
+    if (!id) { cloud.ok = true; cloud.error = null; return; } // rien encore sauvegardé
+    const g = await gh('GET', '/gists/' + id);
+    const f = g.files && g.files[GIST_FILE];
+    if (!f) { cloud.ok = true; return; }
+    let text = f.content;
+    if (f.truncated && f.raw_url) text = await (await fetch(f.raw_url, { headers: { Authorization: 'Bearer ' + GH_TOKEN } })).text();
+    const cfg = sanitizeConfig(JSON.parse(text), true);
+    if (cfg.updatedAt > (state.config.updatedAt || 0)) {
+      state.config = cfg;
+      saveConfigToDisk();
+      broadcast();
+    }
+    cloud.ok = true; cloud.error = null; cloud.loadedAt = Date.now();
+    console.log('[sauvegarde] préparation rechargée depuis GitHub');
+  } catch (e) {
+    cloud.ok = false; cloud.error = e.message;
+    console.error('[sauvegarde] chargement impossible :', e.message);
+  }
+}
+
+let cloudTimer = null;
+let cloudBusy = false;
+let cloudAgain = false;
+function cloudSave() {
+  if (!cloud.enabled) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(async () => {
+    if (cloudBusy) { cloudAgain = true; return; }
+    cloudBusy = true;
+    const snapshotAt = state.config.updatedAt;
+    try {
+      const files = { [GIST_FILE]: { content: JSON.stringify(state.config) } };
+      const id = await findGistId();
+      if (id) await gh('PATCH', '/gists/' + id, { description: GIST_DESC, files });
+      else cloud.gistId = (await gh('POST', '/gists', { description: GIST_DESC, public: false, files })).id;
+      cloud.ok = true; cloud.error = null; cloud.savedAt = Date.now(); cloud.savedVersion = snapshotAt;
+    } catch (e) {
+      cloud.ok = false; cloud.error = e.message;
+      console.error('[sauvegarde] envoi impossible :', e.message);
+    }
+    cloudBusy = false;
+    broadcast();
+    if (cloudAgain) { cloudAgain = false; cloudSave(); }
+  }, 1200);
+}
 
 const DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/;
 const shortId = (s) => String(s || '').replace(/[^\w-]/g, '').slice(0, 40);
@@ -478,6 +564,7 @@ function hostView() {
       : null,
     config: {
       updatedAt: state.config.updatedAt,
+      cloud: { enabled: cloud.enabled, ok: cloud.ok, error: cloud.error, savedAt: cloud.savedAt, synced: cloud.enabled && cloud.ok && cloud.savedVersion === state.config.updatedAt },
       bottles: state.config.bottles.map(bottlePublic),
       statementsCount: state.config.statements.length,
       bodyCount: state.config.bodyCount,
@@ -902,6 +989,7 @@ app.get('/:file', (req, res, next) => {
   res.set('Cache-Control', 'no-cache').sendFile(path.join(PUB, req.params.file));
 });
 
+cloudLoad();
 server.listen(PORT, () => {
   console.log(`Autour d'un Verre — http://localhost:${PORT}  (animateur : /host)`);
 });
