@@ -16,6 +16,9 @@
   let mountedKey = null;
   let panel = null;
   let lastPl = '';
+  let prepMode = false;
+  let mirroredAt = null;
+  const PREP_KEY = 'adv_prep_v1';
 
   function auth(pw) {
     socket.emit('host:auth', { password: pw }, (res) => {
@@ -24,6 +27,7 @@
         store.set(PW_KEY, pw);
         $('login').classList.add('hidden');
         $('app').classList.remove('hidden');
+        syncPrepOnLogin();
       } else {
         store.del(PW_KEY);
         $('loginErr').textContent = (res && res.error) || 'Erreur';
@@ -86,9 +90,18 @@
     $('evTitle').textContent = [H.event.subtitle, H.event.date].filter(Boolean).join(' · ');
     document.title = 'Console · ' + H.event.title;
 
-    $('stepper').innerHTML = H.phases.map((p, i) =>
-      '<button data-p="' + p + '" class="' + (p === H.phase ? 'active' : '') + '"><span class="n">' + (i + 1) + '</span>' + PHASE_LABELS[p] + '</button>').join('');
-    $('stepper').querySelectorAll('button').forEach((b) => { b.onclick = () => act('setPhase', { phase: b.dataset.p }); });
+    $('stepper').innerHTML = '<button data-prep="1" class="' + (prepMode ? 'active' : '') + '" style="margin-right:10px"><span class="n">✦</span>Préparation</button>' +
+      H.phases.map((p, i) =>
+      '<button data-p="' + p + '" class="' + (!prepMode && p === H.phase ? 'active' : '') + '"><span class="n">' + (i + 1) + '</span>' + PHASE_LABELS[p] + '</button>').join('');
+    $('stepper').querySelectorAll('button').forEach((b) => {
+      b.onclick = () => {
+        if (b.dataset.prep) { prepMode = true; mountedKey = null; render(); return; }
+        prepMode = false; mountedKey = null;
+        act('setPhase', { phase: b.dataset.p });
+        render();
+      };
+    });
+    if (H.config.updatedAt && H.config.updatedAt !== mirroredAt) mirrorPrep();
 
     const online = H.players.filter((p) => p.online).length;
     $('pcount').textContent = 'Inscrits : ' + H.players.length + ' · en ligne : ' + online;
@@ -105,11 +118,11 @@
       $('plist').querySelectorAll('.x').forEach((b) => confirmBtn(b, '?', () => act('removePlayer', { id: b.dataset.id })));
     }
 
-    const key = H.phase;
+    const key = prepMode ? 'PREP' : H.phase;
     if (key !== mountedKey) {
       mountedKey = key;
       $('main').innerHTML = '';
-      panel = Panels[H.phase]($('main'), H) || {};
+      panel = (prepMode ? Panels.PREP : Panels[H.phase])($('main'), H) || {};
     }
     if (panel.update) panel.update(H);
   }
@@ -126,28 +139,23 @@
         '<img class="qr" src="/qr.svg" alt="QR code" style="margin:12px auto;display:block">' +
         '<div class="url">' + esc(url.replace(/^https?:\/\//, '')) + '</div></div>' +
         '<div class="card"><div class="label">Arrivés</div><div class="bigstat" id="n"></div>' +
-        '<p class="muted" style="font-size:.85rem">Les lecteurs des affirmations seront répartis entre les invités présents au démarrage.</p>' +
+        '<p class="muted" style="font-size:.85rem">Chaque invité présent au démarrage lira une affirmation, une seule fois.</p>' +
         '<button class="btn block red" id="start">Démarrer le Body Count</button></div></div>' +
-        '<form class="card" id="ev"><div class="label gold">Événement</div><div class="grid2">' +
-        '<label class="field"><span class="label">Thème visuel</span><select class="input" id="theme"><option value="whisky">Whisky · ambre rouge</option><option value="champagne">Champagne · or</option></select></label>' +
-        '<label class="field"><span class="label">Sous-titre</span><input class="input" id="subtitle" placeholder="De whisky avec Aikan"></label>' +
-        '<label class="field"><span class="label">Date</span><input class="input" id="date" placeholder="26.11.2026"></label>' +
-        '<label class="field"><span class="label">Lieu</span><input class="input" id="place"></label>' +
-        '<label class="field"><span class="label">Organisateurs</span><input class="input" id="orga"></label>' +
-        '<label class="field"><span class="label">Nom de l’événement (onglet)</span><input class="input" id="title"></label></div>' +
-        '<button class="btn small" type="submit">Enregistrer</button></form>';
+        '<div class="card" id="prepSum"></div>';
       const q = (id) => root.querySelector('#' + id);
-      ['title', 'date', 'subtitle', 'place', 'orga', 'theme'].forEach((k) => { q(k).value = h.event[k] || ''; });
-      q('theme').value = h.event.theme || 'whisky';
-      q('theme').onchange = () => applyTheme({ theme: q('theme').value });
-      q('ev').onsubmit = (e) => {
-        e.preventDefault();
-        const data = {};
-        ['title', 'date', 'subtitle', 'place', 'orga', 'theme'].forEach((k) => { data[k] = q(k).value; });
-        act('configEvent', data).then((r) => r.ok && toast('Enregistré — visible chez les invités'));
-      };
       q('start').onclick = () => act('startBody');
-      return { update(h) { q('n').textContent = h.players.length; } };
+      return {
+        update(h) {
+          q('n').textContent = h.players.length;
+          const c = h.config;
+          const nb = h.config.bodyCount || Math.min(h.players.length, c.statementsCount) || 0;
+          q('prepSum').innerHTML = '<div class="label gold">Préparation</div>' +
+            '<p style="margin:8px 0 4px">' + esc(h.event.subtitle || '') + ' · ' + esc(h.event.date) + ' · thème ' + (h.event.theme === 'champagne' ? 'Champagne' : 'Whisky') + '</p>' +
+            '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' pari(s) préparé(s) · Body Count : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
+            '<button class="btn small ghost" id="goPrep">Ouvrir la préparation</button>';
+          q('goPrep').onclick = () => { prepMode = true; mountedKey = null; render(); };
+        },
+      };
     },
 
     BODY_COUNT(root) {
@@ -209,16 +217,16 @@
     BOUTEILLE_1(root, h) {
       root.innerHTML =
         '<form class="card" id="cfg"><div class="label gold">Configuration · Le Mot Interdit</div>' +
-        '<label class="field"><span class="label">Nom de la bouteille</span><input class="input" id="bottle" placeholder="ex. Rhum vieux 6 ans"></label>' +
+        '<label class="field"><span class="label">Bouteille</span><select class="input" id="bottle"></select></label>' +
         '<label class="field"><span class="label">Mots interdits (séparés par des virgules)</span><input class="input" id="words"></label>' +
         '<button class="btn small" type="submit">Enregistrer (mis à jour en direct)</button></form>' +
         '<div class="card"><div class="label" id="cnt"></div><div class="wall" id="wall"></div></div>';
       const q = (id) => root.querySelector('#' + id);
-      q('bottle').value = h.b1.bottle;
+      q('bottle').innerHTML = bottleOptions(h, h.b1.bottleId);
       q('words').value = h.b1.forbidden.join(', ');
       q('cfg').onsubmit = (e) => {
         e.preventDefault();
-        act('configB1', { bottle: q('bottle').value, forbidden: q('words').value.split(',') }).then((r) => r.ok && toast('Enregistré'));
+        act('configB1', { bottleId: q('bottle').value || null, forbidden: q('words').value.split(',') }).then((r) => r.ok && toast('Enregistré'));
       };
       return {
         update(h) {
@@ -231,9 +239,9 @@
     BOUTEILLE_2(root, h) {
       root.innerHTML =
         '<form class="card" id="cfg"><div class="label gold">Configuration · Le Match</div><div class="grid2">' +
-        '<label class="field"><span class="label">Côté A</span><input class="input" id="la"></label>' +
-        '<label class="field"><span class="label">Côté B</span><input class="input" id="lb"></label></div>' +
-        '<button class="btn small" type="submit">Enregistrer les libellés</button></form>' +
+        '<label class="field"><span class="label">Côté A</span><select class="input" id="la"></select></label>' +
+        '<label class="field"><span class="label">Côté B</span><select class="input" id="lb"></select></label></div>' +
+        '<button class="btn small" type="submit">Enregistrer</button></form>' +
         '<div class="card"><div class="label">Ce que voient les invités</div><div class="split" id="split"><div class="a" id="pa"></div><div class="b" id="pb"></div></div>' +
         '<p class="muted" id="none">Aucun vote pour l’instant.</p>' +
         '<div class="btn-row" style="margin-top:14px"><button class="btn red" id="lock"></button><button class="btn ghost small" id="reset">Effacer les votes</button></div></div>' +
@@ -241,9 +249,9 @@
         '<div><h3 id="na"></h3><div id="va"></div></div><div><h3 id="nb" style="color:var(--rouge)"></h3><div id="vb"></div></div></div>' +
         '<div class="label" style="margin-top:12px">Pas encore voté</div><div id="abs"></div></div>';
       const q = (id) => root.querySelector('#' + id);
-      q('la').value = h.b2.labels[0];
-      q('lb').value = h.b2.labels[1];
-      q('cfg').onsubmit = (e) => { e.preventDefault(); act('configB2', { labels: [q('la').value, q('lb').value] }).then((r) => r.ok && toast('Enregistré')); };
+      q('la').innerHTML = bottleOptions(h, h.b2.a);
+      q('lb').innerHTML = bottleOptions(h, h.b2.b);
+      q('cfg').onsubmit = (e) => { e.preventDefault(); act('configB2', { a: q('la').value || null, b: q('lb').value || null }).then((r) => r.ok && toast('Enregistré')); };
       let locked = false;
       q('lock').onclick = () => act('b2Lock', { locked: !locked });
       confirmBtn(q('reset'), 'Confirmer ?', () => act('b2Reset'));
@@ -272,13 +280,15 @@
     BOUTEILLE_3(root, h) {
       root.innerHTML =
         '<div class="card" id="cur"></div>' +
-        '<form class="card" id="cfg"><div class="label gold">Préparer un nouveau pari</div><div class="grid2">' +
+        '<div class="card"><div class="label gold">Paris préparés</div><div id="plans" style="margin-top:8px"></div></div>' +
+        '<details class="card"><summary class="label" style="cursor:pointer">Pari improvisé (hors préparation)</summary>' +
+        '<form id="cfg" style="margin-top:8px"><div class="grid2">' +
         '<label class="field"><span class="label">Nom de la bouteille</span><input class="input" id="bottle"></label>' +
         '<label class="field"><span class="label">Visuel (photo, optionnel)</span><input class="input" type="file" accept="image/*" id="img"><img class="img-prev hidden" id="prev" alt=""></label></div>' +
         '<label class="field"><span class="label">Question</span><input class="input" id="question"></label>' +
         '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' +
         [0, 1, 2].map((i) => '<label class="field"><span class="label">Option ' + (i + 1) + '</span><input class="input opt" required></label>').join('') + '</div>' +
-        '<button class="btn red" type="submit" id="launch">Lancer ce pari</button></form>' +
+        '<button class="btn red" type="submit" id="launch">Lancer ce pari</button></form></details>' +
         '<div class="card"><div class="label">Paris joués</div><div class="round-hist" id="hist" style="margin-top:8px"></div></div>';
       const q = (id) => root.querySelector('#' + id);
       const opts = [...root.querySelectorAll('.opt')];
@@ -313,7 +323,22 @@
             : '<span class="muted">Aucun pour l’instant.</span>';
           q('hist').querySelectorAll('button').forEach((b) => { b.onclick = () => act('b3Select', { id: b.dataset.id }); });
 
-          if (!r) { q('cur').innerHTML = '<div class="label">Pari en cours</div><p class="muted">Aucun pari lancé. Les invités voient un écran d’attente. Remplis le formulaire ci-dessous.</p>'; curKey = null; return; }
+          const bt = (id) => h.config.bottles.find((b) => b.id === id);
+          const plansHtml = h.config.paris.length
+            ? h.config.paris.map((p, i) => {
+              const b = bt(p.bottleId);
+              return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(253,252,241,.08)">' +
+                (b && b.image ? '<img src="' + esc(b.image) + '" style="height:44px;width:44px;object-fit:cover;border:1px solid var(--line)">' : '') +
+                '<div style="flex:1"><strong>' + (i + 1) + '. ' + esc(b ? b.name : 'Bouteille ?') + '</strong><br><span class="muted" style="font-size:.82rem">' + esc(p.options.join(' / ')) + (p.correct !== null ? ' · bonne réponse : ' + esc(p.options[p.correct]) : '') + '</span></div>' +
+                '<button class="btn small ' + (p.played ? 'ghost' : '') + '" data-plan="' + esc(p.id) + '">' + (p.played ? 'Relancer' : 'Lancer') + '</button></div>';
+            }).join('')
+            : '<p class="muted" style="margin:0">Aucun pari préparé. Ajoute-les dans « Préparation ».</p>';
+          if (q('plans').dataset.html !== plansHtml) {
+            q('plans').dataset.html = plansHtml;
+            q('plans').innerHTML = plansHtml;
+            q('plans').querySelectorAll('[data-plan]').forEach((b) => { b.onclick = () => act('b3Launch', { planId: b.dataset.plan }).then((x) => x.ok && toast('Pari lancé')); });
+          }
+          if (!r) { q('cur').innerHTML = '<div class="label">Pari en cours</div><p class="muted">Aucun pari lancé : les invités voient un écran d’attente. Lance un pari préparé ci-dessous.</p>'; curKey = null; return; }
           const k = r.id;
           if (curKey !== k) {
             curKey = k;
@@ -332,7 +357,7 @@
             };
             q('hide').onclick = () => act('b3Hide');
             q('opts').innerHTML = r.options.map((o, i) =>
-              '<label class="opt-radio"><input type="radio" name="correct" value="' + i + '"' + (r.correct === i ? ' checked' : '') + '>' +
+              '<label class="opt-radio"><input type="radio" name="correct" value="' + i + '"' + ((r.correct !== null ? r.correct : r.preset) === i ? ' checked' : '') + '>' +
               '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>' + esc(o) + '</strong><span data-c="' + i + '"></span></div><div data-n="' + i + '"></div></div></label>').join('');
           }
           r.options.forEach((_, i) => {
@@ -365,8 +390,198 @@
     },
   };
 
+
+  /* ---------------- Préparation : sauvegarde navigateur ---------------- */
+  function bottleOptions(h, selected) {
+    return '<option value="">— choisir —</option>' + h.config.bottles.map((b) =>
+      '<option value="' + esc(b.id) + '"' + (b.id === selected ? ' selected' : '') + '>' + esc(b.name) + '</option>').join('');
+  }
+  function readLocalPrep() { try { return JSON.parse(store.get(PREP_KEY) || 'null'); } catch (e) { return null; } }
+  function writeLocalPrep(cfg) {
+    try { localStorage.setItem(PREP_KEY, JSON.stringify(cfg)); return true; } catch (e) { return false; }
+  }
+  async function mirrorPrep() {
+    mirroredAt = H.config.updatedAt;
+    const r = await act('getConfigFull');
+    if (r.ok && !writeLocalPrep(r.config)) toast('Photos trop lourdes pour la sauvegarde navigateur : pense à « Exporter ».');
+  }
+  async function syncPrepOnLogin() {
+    const local = readLocalPrep();
+    const r = await act('getConfigFull');
+    if (!r.ok) return;
+    if (local && local.updatedAt > (r.config.updatedAt || 0)) {
+      const w = await act('setConfig', { config: local, keepTime: true });
+      if (w.ok) toast('Préparation restaurée depuis ce navigateur ✓');
+    } else if (r.config.updatedAt) {
+      writeLocalPrep(r.config);
+    }
+  }
+
+  /* ---------------- Panneau Préparation ---------------- */
+  const uid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+  Panels.PREP = function (root) {
+    let draft = null;
+    let dirty = false;
+    root.innerHTML = '<p class="muted">Chargement de la préparation…</p>';
+    act('getConfigFull').then((r) => { if (r.ok) { draft = JSON.parse(JSON.stringify(r.config)); draw(); } });
+
+    const markDirty = () => { dirty = true; const st = root.querySelector('#saveState'); if (st) st.textContent = 'Modifications non enregistrées'; };
+    const bOpts = (sel) => '<option value="">— choisir —</option>' + draft.bottles.map((b) =>
+      '<option value="' + esc(b.id) + '"' + (b.id === sel ? ' selected' : '') + '>' + esc(b.name || 'Sans nom') + '</option>').join('');
+
+    function draw() {
+      const ev = draft.event;
+      root.innerHTML =
+        '<div class="card"><div class="label gold">1 · Événement</div><div class="grid2">' +
+        '<label class="field"><span class="label">Thème visuel</span><select class="input" data-ev="theme"><option value="whisky">Whisky · ambre rouge</option><option value="champagne">Champagne · or</option></select></label>' +
+        '<label class="field"><span class="label">Sous-titre</span><input class="input" data-ev="subtitle" placeholder="De whisky avec Aikan"></label>' +
+        '<label class="field"><span class="label">Date</span><input class="input" data-ev="date" placeholder="26.11.2026"></label>' +
+        '<label class="field"><span class="label">Lieu</span><input class="input" data-ev="place"></label>' +
+        '<label class="field"><span class="label">Organisateurs</span><input class="input" data-ev="orga"></label>' +
+        '<label class="field"><span class="label">Nom (onglet du navigateur)</span><input class="input" data-ev="title"></label></div></div>' +
+
+        '<div class="card"><div class="label gold">2 · Bouteilles de la soirée</div>' +
+        '<p class="muted" style="font-size:.85rem;margin:6px 0 4px">Nom + photo (optionnelle). Elles servent ensuite dans les jeux ci-dessous.</p>' +
+        '<div id="bottles"></div><button class="btn small ghost" id="addBottle" style="margin-top:12px">+ Ajouter une bouteille</button></div>' +
+
+        '<div class="card"><div class="label gold">3 · Body Count</div><div class="grid2">' +
+        '<label class="field"><span class="label">Nombre d’affirmations</span><select class="input" id="bodyCount"><option value="0">Automatique · 1 par invité</option>' +
+        Array.from({ length: 30 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '</option>').join('') + '</select></label>' +
+        '<div class="muted" style="font-size:.82rem;align-self:center">Chaque invité ne lit qu’une fois. S’il y a plus d’affirmations que d’invités, les dernières sont lues par toi.</div></div>' +
+        '<label class="field"><span class="label" id="stLabel">Réserve d’affirmations (une par ligne, dans l’ordre)</span><textarea class="input" id="statements" style="min-height:220px;font-size:.92rem"></textarea></label></div>' +
+
+        '<div class="card"><div class="label gold">4 · Le Mot Interdit</div><div class="grid2">' +
+        '<label class="field"><span class="label">Bouteille</span><select class="input" id="b1b">' + bOpts(draft.b1.bottleId) + '</select></label>' +
+        '<label class="field"><span class="label">Mots interdits (virgules)</span><input class="input" id="b1w"></label></div></div>' +
+
+        '<div class="card"><div class="label gold">5 · Le Match</div><div class="grid2">' +
+        '<label class="field"><span class="label">Côté A</span><select class="input" id="b2a">' + bOpts(draft.b2.a) + '</select></label>' +
+        '<label class="field"><span class="label">Côté B</span><select class="input" id="b2b">' + bOpts(draft.b2.b) + '</select></label></div></div>' +
+
+        '<div class="card"><div class="label gold">6 · Le Juste Prix — paris préparés</div>' +
+        '<div id="paris"></div><button class="btn small ghost" id="addPari" style="margin-top:12px">+ Ajouter un pari</button></div>' +
+
+        '<div class="card" style="position:sticky;bottom:10px;z-index:5;background:var(--bg-2);display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn" id="save">Enregistrer la préparation</button>' +
+        '<span class="muted" id="saveState" style="flex:1;font-size:.85rem">' + (draft.updatedAt ? 'Dernier enregistrement : ' + new Date(draft.updatedAt).toLocaleString('fr-FR') : 'Pas encore enregistrée') + '</span>' +
+        '<button class="btn small ghost" id="exp">Exporter</button><label class="btn small ghost" style="cursor:pointer">Importer<input type="file" accept="application/json,.json" id="imp" hidden></label></div>';
+
+      const q = (sel) => root.querySelector(sel);
+      root.querySelectorAll('[data-ev]').forEach((el) => {
+        el.value = ev[el.dataset.ev] || '';
+        el.addEventListener('input', () => { ev[el.dataset.ev] = el.value; markDirty(); });
+      });
+      q('[data-ev="theme"]').addEventListener('change', (e) => applyTheme({ theme: e.target.value }));
+
+      // Bouteilles
+      q('#bottles').innerHTML = draft.bottles.length ? draft.bottles.map((b, i) =>
+        '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(253,252,241,.08)">' +
+        '<div style="width:64px;height:64px;flex:none;border:1px solid var(--line);border-radius:3px;background:rgba(0,0,0,.3) center/cover no-repeat' + (b.image ? ';background-image:url(' + b.image + ')' : '') + '"></div>' +
+        '<input class="input" data-bn="' + i + '" placeholder="Nom de la bouteille" style="flex:1">' +
+        '<label class="btn small ghost" style="cursor:pointer">' + (b.image ? 'Changer la photo' : 'Photo') + '<input type="file" accept="image/*" data-bi="' + i + '" hidden></label>' +
+        (b.image ? '<button class="btn small ghost" data-bx="' + i + '" title="Retirer la photo">Sans photo</button>' : '') +
+        '<button class="x" data-bd="' + i + '" title="Supprimer" style="border:0;background:none;color:var(--encre-soft);font-size:1.2rem;cursor:pointer">×</button></div>').join('')
+        : '<p class="muted" style="margin:6px 0 0">Aucune bouteille pour l’instant.</p>';
+      root.querySelectorAll('[data-bn]').forEach((el) => {
+        el.value = draft.bottles[el.dataset.bn].name || '';
+        el.addEventListener('input', () => { draft.bottles[el.dataset.bn].name = el.value; markDirty(); });
+        el.addEventListener('change', () => refreshSelects());
+      });
+      root.querySelectorAll('[data-bi]').forEach((el) => {
+        el.addEventListener('change', async () => {
+          const f = el.files[0];
+          if (!f) return;
+          try { draft.bottles[el.dataset.bi].image = await resizeImage(f, 800, 0.8); markDirty(); redraw(); } catch (e) { toast('Image illisible'); }
+        });
+      });
+      root.querySelectorAll('[data-bx]').forEach((el) => { el.onclick = () => { draft.bottles[el.dataset.bx].image = null; markDirty(); redraw(); }; });
+      root.querySelectorAll('[data-bd]').forEach((el) => confirmBtn(el, '?', () => { draft.bottles.splice(Number(el.dataset.bd), 1); markDirty(); redraw(); }));
+      q('#addBottle').onclick = () => { draft.bottles.push({ id: uid(), name: '', image: null }); markDirty(); redraw(); setTimeout(() => { const all = root.querySelectorAll('[data-bn]'); if (all.length) all[all.length - 1].focus(); }, 0); };
+
+      // Body count
+      q('#bodyCount').value = String(draft.bodyCount || 0);
+      q('#bodyCount').onchange = () => { draft.bodyCount = Number(q('#bodyCount').value); markDirty(); };
+      q('#statements').value = draft.statements.join('\n');
+      const stCount = () => { q('#stLabel').textContent = 'Réserve d’affirmations · ' + q('#statements').value.split('\n').filter((x) => x.trim()).length + ' (une par ligne, dans l’ordre)'; };
+      stCount();
+      q('#statements').addEventListener('input', () => { draft.statements = q('#statements').value.split('\n').map((x) => x.trim()).filter(Boolean); stCount(); markDirty(); });
+
+      // Jeux
+      q('#b1w').value = draft.b1.forbidden.join(', ');
+      q('#b1w').addEventListener('input', () => { draft.b1.forbidden = q('#b1w').value.split(',').map((x) => x.trim()).filter(Boolean); markDirty(); });
+      q('#b1b').onchange = () => { draft.b1.bottleId = q('#b1b').value || null; markDirty(); };
+      q('#b2a').onchange = () => { draft.b2.a = q('#b2a').value || null; markDirty(); };
+      q('#b2b').onchange = () => { draft.b2.b = q('#b2b').value || null; markDirty(); };
+
+      // Paris
+      q('#paris').innerHTML = draft.paris.length ? draft.paris.map((p, i) =>
+        '<div style="padding:12px 0;border-bottom:1px solid rgba(253,252,241,.08)"><div class="grid2">' +
+        '<label class="field" style="margin:6px 0"><span class="label">Pari ' + (i + 1) + ' · bouteille</span><select class="input" data-pb="' + i + '">' + bOpts(p.bottleId) + '</select></label>' +
+        '<label class="field" style="margin:6px 0"><span class="label">Question</span><input class="input" data-pq="' + i + '"></label></div>' +
+        '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' + [0, 1, 2].map((k) => '<label class="field" style="margin:6px 0"><span class="label">Option ' + (k + 1) + '</span><input class="input" data-po="' + i + ':' + k + '"></label>').join('') + '</div>' +
+        '<div style="display:flex;gap:10px;align-items:end"><label class="field" style="margin:6px 0;flex:1"><span class="label">Bonne réponse (pré-cochée au moment de révéler)</span><select class="input" data-pc="' + i + '"><option value="">— je choisirai en direct —</option>' +
+        [0, 1, 2].map((k) => '<option value="' + k + '"' + (p.correct === k ? ' selected' : '') + '>Option ' + (k + 1) + '</option>').join('') + '</select></label>' +
+        '<button class="btn small ghost" data-pd="' + i + '" style="margin-bottom:6px">Supprimer</button></div></div>').join('')
+        : '<p class="muted" style="margin:6px 0 0">Aucun pari préparé.</p>';
+      root.querySelectorAll('[data-pq]').forEach((el) => { el.value = draft.paris[el.dataset.pq].question; el.addEventListener('input', () => { draft.paris[el.dataset.pq].question = el.value; markDirty(); }); });
+      root.querySelectorAll('[data-po]').forEach((el) => {
+        const [i, k] = el.dataset.po.split(':').map(Number);
+        el.value = draft.paris[i].options[k];
+        el.addEventListener('input', () => { draft.paris[i].options[k] = el.value; markDirty(); });
+      });
+      root.querySelectorAll('[data-pb]').forEach((el) => { el.onchange = () => { draft.paris[el.dataset.pb].bottleId = el.value || null; markDirty(); }; });
+      root.querySelectorAll('[data-pc]').forEach((el) => { el.onchange = () => { draft.paris[el.dataset.pc].correct = el.value === '' ? null : Number(el.value); markDirty(); }; });
+      root.querySelectorAll('[data-pd]').forEach((el) => confirmBtn(el, 'Confirmer ?', () => { draft.paris.splice(Number(el.dataset.pd), 1); markDirty(); redraw(); }));
+      q('#addPari').onclick = () => {
+        const d = (H && H.b3 && H.b3.defaults) || { question: 'Quel est le prix de cette bouteille ?', options: ['Moins de 30€', 'Entre 30 et 60€', 'Plus de 60€'] };
+        draft.paris.push({ id: uid(), bottleId: null, question: d.question, options: d.options.slice(), correct: null });
+        markDirty(); redraw();
+      };
+
+      // Sauvegarde / export / import
+      q('#save').onclick = save;
+      q('#exp').onclick = () => {
+        const blob = new Blob([JSON.stringify(draft)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'preparation-autour-dun-verre.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      };
+      q('#imp').onchange = async () => {
+        const f = q('#imp').files[0];
+        if (!f) return;
+        try { draft = JSON.parse(await f.text()); draft.bottles = draft.bottles || []; draft.paris = draft.paris || []; markDirty(); redraw(); toast('Importé — pense à enregistrer'); } catch (e) { toast('Fichier illisible'); }
+      };
+      if (dirty) markDirty();
+    }
+    function refreshSelects() {
+      [['#b1b', draft.b1.bottleId], ['#b2a', draft.b2.a], ['#b2b', draft.b2.b]].forEach(([sel, v]) => { const el = root.querySelector(sel); if (el) el.innerHTML = bOpts(v); });
+      root.querySelectorAll('[data-pb]').forEach((el) => { el.innerHTML = bOpts(draft.paris[el.dataset.pb].bottleId); });
+    }
+    function redraw() { const y = window.scrollY; draw(); window.scrollTo(0, y); }
+    async function save() {
+      const btn = root.querySelector('#save');
+      btn.disabled = true;
+      const r = await act('setConfig', { config: draft });
+      btn.disabled = false;
+      if (!r.ok) return;
+      const full = await act('getConfigFull');
+      if (full.ok) {
+        draft = JSON.parse(JSON.stringify(full.config));
+        mirroredAt = full.config.updatedAt;
+        const okLocal = writeLocalPrep(full.config);
+        dirty = false;
+        redraw();
+        root.querySelector('#saveState').textContent = 'Enregistré ✓ sur le serveur' + (okLocal ? ' et dans ce navigateur' : ' (trop lourd pour ce navigateur : exporte une copie)');
+        toast('Préparation enregistrée ✓');
+      }
+    }
+    return {};
+  };
+
   /* Redimensionne une photo côté navigateur avant envoi */
-  function resizeImage(file, max) {
+  function resizeImage(file, max, quality) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -377,7 +592,7 @@
         c.height = Math.round(img.height * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', 0.82));
+        resolve(c.toDataURL('image/jpeg', quality || 0.82));
       };
       img.onerror = reject;
       img.src = url;

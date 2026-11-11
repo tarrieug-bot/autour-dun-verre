@@ -21,14 +21,14 @@ if (!process.env.HOST_PASSWORD) {
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 5e6, pingInterval: 20000, pingTimeout: 25000 });
+const io = new Server(server, { maxHttpBufferSize: 12e6, pingInterval: 20000, pingTimeout: 25000 });
 
 /* ------------------------------------------------------------------ */
 /* Contenu                                                             */
 /* ------------------------------------------------------------------ */
 const PHASES = ['LOBBY', 'BODY_COUNT', 'CLASSEMENT', 'BOUTEILLE_1', 'BOUTEILLE_2', 'BOUTEILLE_3', 'CLOTURE', 'RECAP'];
 
-const STATEMENTS = [
+const DEFAULT_STATEMENTS = [
   "Lève la main si tu as déjà acheté une bouteille juste parce que l'étiquette était belle.",
   "Lève la main si tu as déjà confondu deux spiritueux au goût sans t'en rendre compte.",
   "Lève la main si tu penses qu'un vin ou un rhum vieux est automatiquement meilleur qu'un jeune.",
@@ -39,6 +39,21 @@ const STATEMENTS = [
   "Lève la main si tu crois que la couleur d'un spiritueux en dit long sur sa qualité.",
   "Lève la main si tu as déjà fini un verre que tu n'aimais pas, juste pour ne pas gâcher.",
   "Lève la main si tu es du genre à sentir une bouteille avant même de la goûter.",
+  "Lève la main si tu as déjà fait semblant de sentir des arômes que tu ne sentais pas du tout.",
+  "Lève la main si tu as déjà choisi un vin au restaurant uniquement d'après son prix.",
+  "Lève la main si tu penses qu'un glaçon gâche forcément un bon spiritueux.",
+  "Lève la main si tu gardes une bouteille « pour une grande occasion » qui n'est jamais arrivée.",
+  "Lève la main si tu as déjà goûté un spiritueux dont tu ne saurais même pas prononcer le nom.",
+  "Lève la main si tu as déjà ramené une bouteille de voyage qui n'avait plus le même goût à la maison.",
+  "Lève la main si tu sais faire la différence entre un rhum agricole et un rhum de mélasse.",
+  "Lève la main si tu as déjà dit « il est très rond en bouche » sans trop savoir ce que ça voulait dire.",
+  "Lève la main si tu as déjà mélangé un très bon spiritueux avec du soda.",
+  "Lève la main si tu as déjà visité une distillerie, une cave ou un domaine.",
+  "Lève la main si tu as un verre préféré pour déguster.",
+  "Lève la main si tu as déjà été la seule personne à table à aimer une bouteille.",
+  "Lève la main si tu as déjà noté un vin ou un spiritueux sur une appli.",
+  "Lève la main si tu penses que le champagne, c'est seulement pour les fêtes.",
+  "Lève la main si tu as déjà trinqué sans regarder les autres dans les yeux.",
 ];
 
 const TEAMS = [
@@ -61,13 +76,15 @@ function todayStamp() {
 /* ------------------------------------------------------------------ */
 /* État                                                                */
 /* ------------------------------------------------------------------ */
+const clean = (s, max) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, max);
 let state;
-const images = new Map(); // id -> { mime, buf }
+const images = new Map(); // id -> { mime, buf }  (paris improvisés)
 
-function freshState() {
+/* Préparation de soirée : survit à « Nouvelle session ».
+   Sauvegardée sur disque (si possible) et dans le navigateur de l'animateur. */
+function defaultConfig() {
   return {
-    sessionId: crypto.randomUUID(),
-    phase: 'LOBBY',
+    updatedAt: 0,
     event: {
       title: "Autour d'un Verre",
       date: todayStamp(),
@@ -76,16 +93,116 @@ function freshState() {
       place: "Au CIS, Étang Z'Abricot",
       orga: 'So Greyg & le CIS Martinique',
     },
+    bottles: [], // { id, name, image: dataUrl|null, rev }
+    statements: DEFAULT_STATEMENTS.slice(),
+    bodyCount: 0, // 0 = automatique (1 affirmation par invité)
+    b1: { bottleId: null, forbidden: DEFAULT_FORBIDDEN.slice() },
+    b2: { a: null, b: null },
+    paris: [], // { id, bottleId, question, options[3], correct: 0|1|2|null }
+  };
+}
+
+function freshState(config) {
+  return {
+    sessionId: crypto.randomUUID(),
+    phase: 'LOBBY',
+    config: config || defaultConfig(),
     players: new Map(),
     joinCounter: 0,
-    body: { started: false, index: 0, readers: [] },
+    body: { started: false, index: 0, readers: [], list: [] },
     ranking: null, // [{id, score, rank}]
-    b1: { bottle: '', forbidden: DEFAULT_FORBIDDEN.slice() },
-    b2: { labels: ['Bouteille 1', 'Bouteille 2'], locked: false },
+    b2: { locked: false },
     b3: { rounds: [], currentId: null },
   };
 }
-state = freshState();
+
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+function loadConfigFromDisk() {
+  try { return sanitizeConfig(JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')), true); } catch (e) { return null; }
+}
+let saveTimer = null;
+function saveConfigToDisk() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(CONFIG_FILE, JSON.stringify(state.config)); } catch (e) { /* disque indisponible */ }
+  }, 300);
+}
+function touchConfig() { state.config.updatedAt = Date.now(); saveConfigToDisk(); }
+
+const DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/;
+const shortId = (s) => String(s || '').replace(/[^\w-]/g, '').slice(0, 40);
+
+function sanitizeConfig(c, keepTime) {
+  const d = defaultConfig();
+  if (!c || typeof c !== 'object') return d;
+  const ev = c.event || {};
+  const out = {
+    updatedAt: keepTime && Number(c.updatedAt) > 0 ? Number(c.updatedAt) : Date.now(),
+    event: {
+      title: clean(ev.title, 60) || d.event.title,
+      date: clean(ev.date, 20) || d.event.date,
+      theme: ev.theme === 'champagne' ? 'champagne' : 'whisky',
+      subtitle: clean(ev.subtitle, 60),
+      place: clean(ev.place, 80),
+      orga: clean(ev.orga, 80),
+    },
+    bottles: [],
+    statements: [],
+    bodyCount: Math.max(0, Math.min(60, parseInt(c.bodyCount, 10) || 0)),
+    b1: { bottleId: null, forbidden: d.b1.forbidden },
+    b2: { a: null, b: null },
+    paris: [],
+  };
+  const seen = new Set();
+  (Array.isArray(c.bottles) ? c.bottles : []).slice(0, 20).forEach((b) => {
+    const id = shortId(b && b.id) || crypto.randomUUID();
+    if (seen.has(id)) return;
+    seen.add(id);
+    const img = typeof b.image === 'string' && DATA_URL_RE.test(b.image) && b.image.length < 3.5e6 ? b.image : null;
+    out.bottles.push({ id, name: clean(b.name, 60) || 'Bouteille', image: img, rev: crypto.createHash('md5').update(img || '').digest('hex').slice(0, 8) });
+  });
+  const has = (id) => out.bottles.some((b) => b.id === id);
+  const st = (Array.isArray(c.statements) ? c.statements : []).map((x) => clean(x, 240)).filter(Boolean).slice(0, 60);
+  out.statements = st.length ? st : d.statements;
+  if (c.b1) {
+    out.b1.bottleId = has(c.b1.bottleId) ? c.b1.bottleId : null;
+    const words = (Array.isArray(c.b1.forbidden) ? c.b1.forbidden : []).map((w) => clean(w, 30)).filter(Boolean);
+    out.b1.forbidden = [...new Set(words)].slice(0, 30);
+  }
+  if (c.b2) {
+    out.b2.a = has(c.b2.a) ? c.b2.a : null;
+    out.b2.b = has(c.b2.b) ? c.b2.b : null;
+  }
+  (Array.isArray(c.paris) ? c.paris : []).slice(0, 20).forEach((p) => {
+    const opts = (Array.isArray(p && p.options) ? p.options : []).slice(0, 3).map((o) => clean(o, 40));
+    while (opts.length < 3) opts.push('');
+    out.paris.push({
+      id: shortId(p.id) || crypto.randomUUID(),
+      bottleId: has(p.bottleId) ? p.bottleId : null,
+      question: clean(p.question, 120) || DEFAULT_QUESTION,
+      options: opts.map((o, i) => o || DEFAULT_OPTIONS[i]),
+      correct: [0, 1, 2].includes(p.correct) ? p.correct : null,
+    });
+  });
+  return out;
+}
+
+state = freshState(loadConfigFromDisk() || undefined);
+
+const bottleById = (id) => state.config.bottles.find((b) => b.id === id) || null;
+const bottleImg = (b) => (b && b.image ? '/bottle/' + b.id + '?v=' + b.rev : null);
+const bottlePublic = (b) => (b ? { id: b.id, name: b.name, image: bottleImg(b) } : null);
+const b1Bottle = () => bottleById(state.config.b1.bottleId);
+function b2Sides() {
+  const A = bottleById(state.config.b2.a);
+  const B = bottleById(state.config.b2.b);
+  return [
+    { label: A ? A.name : 'Bouteille 1', image: bottleImg(A) },
+    { label: B ? B.name : 'Bouteille 2', image: bottleImg(B) },
+  ];
+}
+const b2Labels = () => b2Sides().map((x) => x.label);
 
 function newPlayer(id, pseudo, word, isBot = false) {
   return {
@@ -100,7 +217,6 @@ function newPlayer(id, pseudo, word, isBot = false) {
   };
 }
 
-const clean = (s, max) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, max);
 const playersList = () => [...state.players.values()].sort((a, b) => a.order - b.order);
 const scoreOf = (p) => Object.values(p.body).filter((v) => v === true).length;
 const teamObj = (key) => TEAMS.find((t) => t.key === key) || null;
@@ -115,8 +231,13 @@ function connectedIds() {
 /* Logique de jeu                                                      */
 /* ------------------------------------------------------------------ */
 function startBody() {
+  // Chaque invité lit une seule fois : autant d'affirmations que d'invités (sauf réglage manuel).
+  // S'il y a plus d'affirmations que d'invités, les dernières sont lues par l'animateur.
   const list = playersList();
-  state.body.readers = STATEMENTS.map((_, i) => (list.length ? list[i % list.length].id : null));
+  const stock = state.config.statements;
+  const n = Math.max(1, Math.min(stock.length, state.config.bodyCount || list.length || 1));
+  state.body.list = stock.slice(0, n);
+  state.body.readers = state.body.list.map((_, i) => (i < list.length ? list[i].id : null));
   state.body.index = 0;
   state.body.started = true;
   state.phase = 'BODY_COUNT';
@@ -189,7 +310,7 @@ function guestView(pid) {
     role: 'guest',
     sessionId: state.sessionId,
     phase: state.phase,
-    event: { ...state.event },
+    event: { ...state.config.event },
     playerCount: list.length,
     me: p
       ? { id: p.id, pseudo: p.pseudo, word: p.word, team: teamObj(p.team) }
@@ -207,8 +328,8 @@ function guestView(pid) {
       const reader = readerId ? state.players.get(readerId) : null;
       v.body = {
         index: i,
-        total: STATEMENTS.length,
-        text: STATEMENTS[i],
+        total: state.body.list.length,
+        text: state.body.list[i],
         isReader: !!p && readerId === p.id,
         readerPseudo: reader ? reader.pseudo : null,
         myAnswer: p && p.body[i] !== undefined ? p.body[i] : null,
@@ -221,14 +342,15 @@ function guestView(pid) {
     case 'CLASSEMENT':
       if (p && state.ranking) {
         const mates = list.filter((x) => x.team === p.team && x.id !== p.id).map((x) => ({ pseudo: x.pseudo, word: x.word }));
-        v.ranking = { score: scoreOf(p), rank: rankOf(p.id), total: state.ranking.length, teammates: mates };
+        v.ranking = { score: scoreOf(p), of: state.body.list.length, rank: rankOf(p.id), total: state.ranking.length, teammates: mates };
       } else v.ranking = null;
       break;
 
     case 'BOUTEILLE_1':
       v.b1 = {
-        bottle: state.b1.bottle,
-        forbidden: state.b1.forbidden.slice(),
+        bottle: b1Bottle() ? b1Bottle().name : '',
+        image: bottleImg(b1Bottle()),
+        forbidden: state.config.b1.forbidden.slice(),
         myNote: p && p.note1 ? p.note1.text : null,
         wall: list
           .filter((x) => x.note1)
@@ -240,7 +362,8 @@ function guestView(pid) {
     case 'BOUTEILLE_2': {
       const c = b2Counts();
       v.b2 = {
-        labels: state.b2.labels.slice(),
+        labels: b2Labels(),
+        images: b2Sides().map((x) => x.image),
         locked: state.b2.locked,
         myVote: p ? p.vote2 : null,
         pct: pctPair(c[0], c[1]), // pourcentages uniquement
@@ -297,7 +420,7 @@ function recapFor(p) {
     const mine = c[p.vote2];
     const other = c[1 - p.vote2];
     vote = {
-      label: state.b2.labels[p.vote2],
+      label: b2Labels()[p.vote2],
       side: mine > other ? 'majorite' : mine < other ? 'minorite' : 'egalite',
     };
   }
@@ -318,10 +441,11 @@ function recapFor(p) {
     word: p.word,
     team: teamObj(p.team),
     score: state.body.started ? scoreOf(p) : null,
+    of: state.body.list.length,
     rank: rankOf(p.id),
     total: state.ranking ? state.ranking.length : null,
     note1: p.note1 ? p.note1.text : null,
-    bottle1: state.b1.bottle,
+    bottle1: b1Bottle() ? b1Bottle().name : '',
     vote,
     paris,
     closing: p.closing ? p.closing.text : null,
@@ -339,7 +463,7 @@ function hostView() {
     sessionId: state.sessionId,
     phase: state.phase,
     phases: PHASES,
-    event: { ...state.event },
+    event: { ...state.config.event },
     teams: TEAMS,
     players: list.map((p) => ({
       id: p.id, pseudo: p.pseudo, word: p.word, isBot: p.isBot, online: p.isBot || online.has(p.id),
@@ -348,22 +472,34 @@ function hostView() {
     body: {
       started: state.body.started,
       index: i,
-      total: STATEMENTS.length,
-      text: STATEMENTS[i],
-      readerPseudo: state.body.readers[i] ? (byId(state.body.readers[i]) || {}).pseudo || '—' : null,
-      readers: state.body.readers.map((id) => (id && byId(id) ? byId(id).pseudo : '—')),
+      total: state.body.list.length,
+      text: state.body.list[i],
+      readerPseudo: state.body.readers[i] ? (byId(state.body.readers[i]) || {}).pseudo || '—' : 'Animateur',
+      readers: state.body.readers.map((id) => (id && byId(id) ? byId(id).pseudo : 'Animateur')),
       answers: list.map((p) => ({ pseudo: p.pseudo, answer: p.body[i] === undefined ? null : p.body[i] })),
     },
     ranking: state.ranking
       ? state.ranking.filter((r) => byId(r.id)).map((r) => ({ ...r, pseudo: byId(r.id).pseudo, word: byId(r.id).word, team: byId(r.id).team, score: scoreOf(byId(r.id)) }))
       : null,
+    config: {
+      updatedAt: state.config.updatedAt,
+      bottles: state.config.bottles.map(bottlePublic),
+      statementsCount: state.config.statements.length,
+      bodyCount: state.config.bodyCount,
+      b1: { ...state.config.b1 },
+      b2: { ...state.config.b2 },
+      paris: state.config.paris.map((p) => ({ ...p, played: state.b3.rounds.some((r) => r.planId === p.id) })),
+    },
     b1: {
-      bottle: state.b1.bottle,
-      forbidden: state.b1.forbidden.slice(),
+      bottle: b1Bottle() ? b1Bottle().name : '',
+      bottleId: state.config.b1.bottleId,
+      forbidden: state.config.b1.forbidden.slice(),
       wall: list.filter((p) => p.note1).sort((a, b) => b.note1.ts - a.note1.ts).map((p) => ({ pseudo: p.pseudo, text: p.note1.text })),
     },
     b2: {
-      labels: state.b2.labels.slice(),
+      labels: b2Labels(),
+      a: state.config.b2.a,
+      b: state.config.b2.b,
       locked: state.b2.locked,
       counts: c2,
       pct: pctPair(c2[0], c2[1]),
@@ -376,7 +512,7 @@ function hostView() {
       rounds: state.b3.rounds.map((r, idx) => {
         const counts = roundCounts(r);
         return {
-          id: r.id, number: idx + 1, bottle: r.bottle, image: r.image, question: r.question, options: r.options,
+          id: r.id, number: idx + 1, bottle: r.bottle, image: r.image, question: r.question, options: r.options, preset: r.preset,
           locked: r.locked, revealed: r.revealed, correct: r.correct, counts, pct: percents(counts),
           names: [0, 1, 2].map((o) => list.filter((p) => r.answers[p.id] === o).map((p) => p.pseudo)),
         };
@@ -521,7 +657,7 @@ io.on('connection', (socket) => {
     if (state.phase !== 'BOUTEILLE_1') return fail(ack, 'Ce n’est plus le moment.');
     const text = clean(msg && msg.text, 280);
     if (!text) return fail(ack, 'Écris quelque chose !');
-    const bad = findForbidden(text, state.b1.forbidden);
+    const bad = findForbidden(text, state.config.b1.forbidden);
     if (bad.length) return fail(ack, 'Mot interdit : ' + bad.join(', '));
     p.note1 = { text, ts: Date.now() };
     ok(ack);
@@ -605,33 +741,52 @@ function hostAction(a) {
       return;
     case 'bodyNav': {
       const n = state.body.index + (a.delta > 0 ? 1 : -1);
-      if (n < 0 || n >= STATEMENTS.length) return;
+      if (n < 0 || n >= state.body.list.length) return;
       state.body.index = n;
       return;
     }
     case 'reassignReaders':
       startBody();
       return;
+    case 'saveStatements': {
+      const st = (Array.isArray(a.statements) ? a.statements : []).map((x) => clean(x, 240)).filter(Boolean).slice(0, 60);
+      if (st.length) state.config.statements = st;
+      state.config.bodyCount = Math.max(0, Math.min(60, parseInt(a.bodyCount, 10) || 0));
+      touchConfig();
+      return;
+    }
     case 'showRanking':
       computeRanking();
       state.phase = 'CLASSEMENT';
       return;
+    case 'getConfigFull':
+      return { config: state.config };
+    case 'setConfig': {
+      // keepTime : restauration depuis le navigateur (garde l'horodatage d'origine)
+      state.config = sanitizeConfig(a.config, !!a.keepTime);
+      saveConfigToDisk();
+      return { updatedAt: state.config.updatedAt };
+    }
     case 'configEvent':
-      state.event.title = clean(a.title, 60) || "Autour d'un Verre";
-      state.event.date = clean(a.date, 20) || todayStamp();
-      state.event.theme = a.theme === 'champagne' ? 'champagne' : 'whisky';
-      state.event.subtitle = clean(a.subtitle, 60);
-      state.event.place = clean(a.place, 80);
-      state.event.orga = clean(a.orga, 80);
+      touchConfig();
+      state.config.event.title = clean(a.title, 60) || "Autour d'un Verre";
+      state.config.event.date = clean(a.date, 20) || todayStamp();
+      state.config.event.theme = a.theme === 'champagne' ? 'champagne' : 'whisky';
+      state.config.event.subtitle = clean(a.subtitle, 60);
+      state.config.event.place = clean(a.place, 80);
+      state.config.event.orga = clean(a.orga, 80);
       return;
     case 'configB1': {
-      state.b1.bottle = clean(a.bottle, 60);
+      state.config.b1.bottleId = bottleById(a.bottleId) ? a.bottleId : null;
       const words = (Array.isArray(a.forbidden) ? a.forbidden : []).map((w) => clean(w, 30)).filter(Boolean);
-      state.b1.forbidden = [...new Set(words)].slice(0, 30);
+      state.config.b1.forbidden = [...new Set(words)].slice(0, 30);
+      touchConfig();
       return;
     }
     case 'configB2':
-      state.b2.labels = [clean(a.labels && a.labels[0], 40) || 'Bouteille 1', clean(a.labels && a.labels[1], 40) || 'Bouteille 2'];
+      state.config.b2.a = bottleById(a.a) ? a.a : null;
+      state.config.b2.b = bottleById(a.b) ? a.b : null;
+      touchConfig();
       return;
     case 'b2Lock':
       state.b2.locked = !!a.locked;
@@ -641,12 +796,20 @@ function hostAction(a) {
       state.b2.locked = false;
       return;
     case 'b3Launch': {
+      if (a.planId) {
+        const plan = state.config.paris.find((p) => p.id === a.planId);
+        if (!plan) return { error: 'Pari préparé introuvable.' };
+        const bt = bottleById(plan.bottleId);
+        a = { bottle: bt ? bt.name : '', imageUrl: bottleImg(bt), question: plan.question, options: plan.options, preset: plan.correct, planId: plan.id };
+      }
       const opts = (Array.isArray(a.options) ? a.options : []).map((o) => clean(o, 40));
       if (opts.length !== 3 || opts.some((o) => !o)) return { error: 'Il faut exactement 3 options.' };
       const r = {
         id: crypto.randomUUID(),
         bottle: clean(a.bottle, 60),
-        image: typeof a.image === 'string' && /^\/img\/[\w-]+$/.test(a.image) ? a.image : null,
+        image: a.imageUrl || (typeof a.image === 'string' && /^\/img\/[\w-]+$/.test(a.image) ? a.image : null),
+        planId: a.planId || null,
+        preset: [0, 1, 2].includes(a.preset) ? a.preset : null,
         question: clean(a.question, 120) || DEFAULT_QUESTION,
         options: opts,
         answers: {},
@@ -709,7 +872,7 @@ function hostAction(a) {
       for (const p of playersList()) if (p.isBot) hostAction({ type: 'removePlayer', id: p.id });
       return;
     case 'reset':
-      state = freshState();
+      state = freshState(state.config); // la préparation est conservée
       images.clear();
       for (const s of io.of('/').sockets.values()) if (!s.data.isHost) { s.data.pid = null; s.emit('session:reset'); }
       return;
@@ -729,6 +892,12 @@ app.get('/img/:id', (req, res) => {
   const img = images.get(req.params.id);
   if (!img) return res.status(404).end();
   res.set('Content-Type', img.mime).set('Cache-Control', 'public, max-age=86400').send(img.buf);
+});
+app.get('/bottle/:id', (req, res) => {
+  const b = bottleById(req.params.id);
+  const m = b && b.image ? DATA_URL_RE.exec(b.image) : null;
+  if (!m) return res.status(404).end();
+  res.set('Content-Type', m[1]).set('Cache-Control', 'public, max-age=604800').send(Buffer.from(m[2], 'base64'));
 });
 app.get('/qr.svg', async (req, res) => {
   const base = process.env.PUBLIC_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;

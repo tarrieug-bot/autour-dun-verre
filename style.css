@@ -318,6 +318,7 @@ select.input option { background: var(--bg-2); }
 .match { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .match .btn { min-height: 160px; flex-direction: column; letter-spacing: .14em; white-space: normal; font-size: .7rem; }
 .match .btn .big { font-family: var(--serif); font-style: italic; font-size: 1.6rem; font-weight: 400; line-height: 1.1; text-transform: none; letter-spacing: 0; }
+.match-img { width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 8px; border-radius: 2px; }
 .match .btn.ghost.side-b { border-color: var(--line); color: var(--cream); }
 .match .btn.side-b:not(.ghost) { background: linear-gradient(135deg, var(--gold), #fff1cf); border-color: var(--gold); color: var(--bg); box-shadow: 0 6px 24px -10px var(--gold); }
 .split { display: flex; height: 58px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); margin-top: 18px; }

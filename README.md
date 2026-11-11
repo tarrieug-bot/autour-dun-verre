@@ -23,6 +23,23 @@ npm install
 HOST_PASSWORD=monmotdepasse npm start   # http://localhost:3000 et /host
 ```
 
+## Préparer la soirée en amont
+
+Console `/host` → bouton **✦ Préparation** : événement (thème, date…), bouteilles (nom + photo),
+réserve d'affirmations du Body Count, bouteille du Mot Interdit, duel du Match, paris du Juste Prix
+(avec la bonne réponse pré-cochée si tu veux). Puis **Enregistrer la préparation**.
+
+La préparation est gardée sur le serveur **et** dans le navigateur de l'animateur : si le serveur gratuit
+s'est endormi (mémoire effacée), il suffit d'ouvrir `/host` sur le même ordinateur, elle est restaurée
+automatiquement. « Exporter / Importer » permet de la passer d'un appareil à un autre.
+« Nouvelle session » remet les joueurs à zéro mais conserve la préparation.
+
+Body Count : 1 affirmation par invité présent au démarrage (chacun ne lit qu'une fois).
+
+## Mise à jour du site
+
+Après un changement de code sur GitHub : Render → service `autour-dun-verre` → **Manual Deploy → Deploy latest commit**.
+
 ## Répéter seul (mode démo)
 
 Dans la console `/host`, panneau « Mode démo » :

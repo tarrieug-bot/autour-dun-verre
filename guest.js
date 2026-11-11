@@ -160,7 +160,7 @@
           $('ctr').textContent = 'Affirmation ' + (b.index + 1) + ' / ' + b.total;
           $('prog').style.width = ((b.index + 1) / b.total) * 100 + '%';
           $('stmt').textContent = b.text;
-          $('readby').textContent = !b.isReader && b.readerPseudo ? 'Lue à voix haute par ' + b.readerPseudo : '';
+          $('readby').textContent = b.isReader ? '' : b.readerPseudo ? 'Lue à voix haute par ' + (b.readerPseudo === 'Animateur' ? 'l’animateur' : b.readerPseudo) : 'Lue par l’animateur';
           $('reader').innerHTML = b.isReader
             ? '<div class="reader-box"><span class="serif">C’est à toi de la lire à voix haute !</span>Lis-la à toute la table, puis réponds.</div>'
             : '';
@@ -183,7 +183,7 @@
       root.innerHTML =
         head('Body Count · résultats', 'Ton classement') +
         '<div class="card stats"><div><div class="label">Rang</div><div class="big-num">' + r.rank + '<sup style="font-size:1.4rem">' + (r.rank === 1 ? 'er' : 'e') + '</sup></div><div class="muted" style="font-size:.8rem">sur ' + r.total + '</div></div>' +
-        '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« oui » sur 10</div></div></div>' +
+        '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« oui » sur ' + (r.of || 10) + '</div></div></div>' +
         (t
           ? '<div class="card team-card" style="background:' + t.color + '"><div class="label">Ton équipe</div><h2>' + esc(t.name) + '</h2>' +
             '<ul class="mates">' + (r.teammates.length ? r.teammates.map((m) => '<li>' + esc(m.pseudo) + ' · <em>' + esc(m.word) + '</em></li>').join('') : '<li>Tu es seul·e pour l’instant !</li>') + '</ul>' + sprig() + '</div>'
@@ -201,6 +201,7 @@
     BOUTEILLE_1(root, s) {
       root.innerHTML =
         head('Bouteille n°1', 'Le Mot Interdit', s.b1.bottle ? 'Dans ton verre : <strong>' + esc(s.b1.bottle) + '</strong>' : '') +
+        (s.b1.image ? '<div class="bottle-visual"><img src="' + esc(s.b1.image) + '" alt=""></div>' : '') +
         '<div class="card"><div class="label">Mots interdits</div><div class="forbidden" id="fw"></div>' +
         '<label class="field"><span class="label">Décris ce que tu ressens en goûtant</span>' +
         '<textarea class="input" id="txt" maxlength="280" placeholder="Arômes, texture, souvenir…"></textarea></label>' +
@@ -256,8 +257,11 @@
       return {
         update(s) {
           const b = s.b2;
-          $('a').innerHTML = '<span class="label" style="color:inherit">côté A</span><span class="big">' + esc(b.labels[0]) + '</span>';
-          $('b').innerHTML = '<span class="label" style="color:inherit">côté B</span><span class="big">' + esc(b.labels[1]) + '</span>';
+          const im = (i) => (b.images && b.images[i] ? '<img src="' + esc(b.images[i]) + '" alt="" class="match-img">' : '');
+          const ha = im(0) + '<span class="label" style="color:inherit">côté A</span><span class="big">' + esc(b.labels[0]) + '</span>';
+          const hb = im(1) + '<span class="label" style="color:inherit">côté B</span><span class="big">' + esc(b.labels[1]) + '</span>';
+          if ($('a').dataset.h !== ha) { $('a').dataset.h = ha; $('a').innerHTML = ha; }
+          if ($('b').dataset.h !== hb) { $('b').dataset.h = hb; $('b').innerHTML = hb; }
           $('a').classList.toggle('ghost', b.myVote !== 0);
           $('b').classList.toggle('ghost', b.myVote !== 1);
           $('a').disabled = $('b').disabled = b.locked;
@@ -375,7 +379,7 @@
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-team" style="background:' + t.color + '"><span>' + esc(t.name) + '</span><span class="label">équipe</span></div>' : '') +
-        sec('Body Count', r.score === null ? none : r.score + ' « oui » <small>' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
+        sec('Body Count', r.score === null ? none : r.score + ' « oui » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
         sec('Le Mot Interdit' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         sec('Le Match', voteTxt) +
         '<div class="recap-sec"><div class="label">Le Juste Prix</div><div style="margin-top:4px">' + paris + '</div></div>' +
