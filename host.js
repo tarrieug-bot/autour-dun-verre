@@ -105,11 +105,11 @@
 
     const online = H.players.filter((p) => p.online).length;
     $('pcount').textContent = 'Inscrits : ' + H.players.length + ' · en ligne : ' + online;
-    const teamColor = (k) => { const t = H.teams.find((x) => x.key === k); return t ? t.color : null; };
+    const profileColor = (k) => { const t = H.profiles.find((x) => x.key === k); return t ? t.color : null; };
     const plHtml = H.players.length
       ? H.players.map((p) => '<li><span class="dot ' + (p.online ? 'on' : '') + '"></span>' +
         '<span class="grow"><strong>' + esc(p.pseudo) + '</strong> · <em>' + esc(p.word) + '</em>' + (p.isBot ? ' <span class="muted">(fictif)</span>' : '') + '</span>' +
-        (p.team ? '<span class="dot" style="background:' + teamColor(p.team) + '"></span>' : '') +
+        (p.profile ? '<span class="dot" title="' + esc((H.profiles.find((x) => x.key === p.profile) || {}).name || '') + '" style="background:' + profileColor(p.profile) + '"></span>' : '') +
         '<button class="x" title="Retirer (2 clics)" data-id="' + esc(p.id) + '">×</button></li>').join('')
       : '<li class="muted">Personne pour l’instant.</li>';
     if (plHtml !== lastPl) {
@@ -193,23 +193,18 @@
     CLASSEMENT(root) {
       root.innerHTML =
         '<div class="card"><div class="label gold">Classement du Body Count</div><table class="rank" id="tbl"></table>' +
-        '<div class="btn-row" style="margin-top:14px"><button class="btn ghost small" id="recalc">Recalculer les équipes</button><button class="btn small" id="go">Passer à la Bouteille 1 →</button></div></div>' +
-        '<div class="grid2" id="teams" style="grid-template-columns:repeat(3,1fr)"></div>';
+        '<div class="btn-row" style="margin-top:14px"><button class="btn ghost small" id="recalc">Recalculer les profils</button><button class="btn small" id="go">Passer à la Bouteille 1 →</button></div></div>' +
+        '';
       const q = (id) => root.querySelector('#' + id);
       q('recalc').onclick = () => act('setPhase', { phase: 'CLASSEMENT' });
       q('go').onclick = () => act('setPhase', { phase: 'BOUTEILLE_1' });
       return {
         update(h) {
-          const tc = (k) => h.teams.find((t) => t.key === k) || { name: '—', color: 'transparent' };
+          const tc = (k) => h.profiles.find((t) => t.key === k) || { name: '—', color: 'transparent' };
           const rk = h.ranking || [];
-          q('tbl').innerHTML = '<tr><th class="label">#</th><th class="label">Invité</th><th class="label">Score</th><th class="label">Équipe</th></tr>' +
+          q('tbl').innerHTML = '<tr><th class="label">#</th><th class="label">Invité</th><th class="label">Score</th><th class="label">Profil de dégustateur</th></tr>' +
             rk.map((r) => '<tr><td>' + r.rank + '</td><td><strong>' + esc(r.pseudo) + '</strong> · <em class="serif">' + esc(r.word) + '</em></td><td>' + r.score + '</td>' +
-              '<td><span class="team-badge" style="background:' + tc(r.team).color + '">' + esc(tc(r.team).name) + '</span></td></tr>').join('');
-          q('teams').innerHTML = h.teams.map((t) => {
-            const m = h.players.filter((p) => p.team === t.key);
-            return '<div class="card team-card" style="background:' + t.color + '"><div class="label">' + m.length + ' membres</div><h3>' + esc(t.name) + '</h3>' +
-              '<ul class="mates">' + m.map((p) => '<li>' + esc(p.pseudo) + '</li>').join('') + '</ul></div>';
-          }).join('');
+              '<td><span class="profile-badge" style="background:' + tc(r.profile).color + '">' + esc(tc(r.profile).name) + '</span></td></tr>').join('');
         },
       };
     },

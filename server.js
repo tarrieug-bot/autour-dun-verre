@@ -56,10 +56,11 @@ const DEFAULT_STATEMENTS = [
   "Lève la main si tu as déjà trinqué sans regarder les autres dans les yeux.",
 ];
 
-const TEAMS = [
-  { key: 'epicurieux', name: 'Les Épicurieux', color: 'var(--team-1)' },
-  { key: 'amateurs', name: 'Les Amateurs Éclairés', color: 'var(--team-2)' },
-  { key: 'sages', name: 'Les Sages du Bar', color: 'var(--team-3)' },
+// Profils de dégustateur : résultat personnel du Body Count (tiers du classement)
+const PROFILES = [
+  { key: 'epicurieux', name: 'Les Épicurieux', color: 'var(--profile-1)' },
+  { key: 'amateurs', name: 'Les Amateurs Éclairés', color: 'var(--profile-2)' },
+  { key: 'sages', name: 'Les Sages du Bar', color: 'var(--profile-3)' },
 ];
 
 const DEFAULT_FORBIDDEN = ['bon', 'fort', 'sucré', 'sympa', 'bien'];
@@ -210,7 +211,7 @@ function newPlayer(id, pseudo, word, isBot = false) {
     order: ++state.joinCounter,
     joinedAt: Date.now(),
     body: {}, // index -> true/false
-    team: null,
+    profile: null,
     note1: null, // { text, ts }
     vote2: null, // 0 | 1
     closing: null, // { text, ts }
@@ -219,7 +220,7 @@ function newPlayer(id, pseudo, word, isBot = false) {
 
 const playersList = () => [...state.players.values()].sort((a, b) => a.order - b.order);
 const scoreOf = (p) => Object.values(p.body).filter((v) => v === true).length;
-const teamObj = (key) => TEAMS.find((t) => t.key === key) || null;
+const profileObj = (key) => PROFILES.find((t) => t.key === key) || null;
 
 function connectedIds() {
   const set = new Set();
@@ -253,16 +254,10 @@ function computeRanking() {
   const sizes = [base + (rem >= 1 ? 1 : 0), base + (rem === 2 ? 1 : 0), base];
   list.forEach((r, idx) => {
     r.rank = idx + 1;
-    const teamIdx = idx < sizes[0] ? 0 : idx < sizes[0] + sizes[1] ? 1 : 2;
-    state.players.get(r.id).team = TEAMS[teamIdx].key;
+    const tier = idx < sizes[0] ? 0 : idx < sizes[0] + sizes[1] ? 1 : 2;
+    state.players.get(r.id).profile = PROFILES[tier].key;
   });
   state.ranking = list.map(({ id, score, rank }) => ({ id, score, rank }));
-}
-
-function smallestTeam() {
-  const counts = TEAMS.map((t) => ({ key: t.key, n: playersList().filter((p) => p.team === t.key).length }));
-  counts.sort((a, b) => a.n - b.n);
-  return counts[0].key;
 }
 
 function rankOf(pid) {
@@ -313,7 +308,7 @@ function guestView(pid) {
     event: { ...state.config.event },
     playerCount: list.length,
     me: p
-      ? { id: p.id, pseudo: p.pseudo, word: p.word, team: teamObj(p.team) }
+      ? { id: p.id, pseudo: p.pseudo, word: p.word, profile: profileObj(p.profile) }
       : null,
   };
 
@@ -341,8 +336,8 @@ function guestView(pid) {
 
     case 'CLASSEMENT':
       if (p && state.ranking) {
-        const mates = list.filter((x) => x.team === p.team && x.id !== p.id).map((x) => ({ pseudo: x.pseudo, word: x.word }));
-        v.ranking = { score: scoreOf(p), of: state.body.list.length, rank: rankOf(p.id), total: state.ranking.length, teammates: mates };
+        // Résultat strictement personnel : aucune information sur les autres invités
+        v.ranking = { score: scoreOf(p), of: state.body.list.length, rank: rankOf(p.id), total: state.ranking.length };
       } else v.ranking = null;
       break;
 
@@ -402,7 +397,7 @@ function guestView(pid) {
         wall: list
           .filter((x) => x.closing)
           .sort((a, b) => a.closing.ts - b.closing.ts)
-          .map((x) => ({ pseudo: x.pseudo, text: x.closing.text, team: x.team })),
+          .map((x) => ({ pseudo: x.pseudo, text: x.closing.text })),
       };
       break;
 
@@ -439,7 +434,7 @@ function recapFor(p) {
   return {
     pseudo: p.pseudo,
     word: p.word,
-    team: teamObj(p.team),
+    profile: profileObj(p.profile),
     score: state.body.started ? scoreOf(p) : null,
     of: state.body.list.length,
     rank: rankOf(p.id),
@@ -464,10 +459,10 @@ function hostView() {
     phase: state.phase,
     phases: PHASES,
     event: { ...state.config.event },
-    teams: TEAMS,
+    profiles: PROFILES,
     players: list.map((p) => ({
       id: p.id, pseudo: p.pseudo, word: p.word, isBot: p.isBot, online: p.isBot || online.has(p.id),
-      score: scoreOf(p), team: p.team, rank: rankOf(p.id),
+      score: scoreOf(p), profile: p.profile, rank: rankOf(p.id),
     })),
     body: {
       started: state.body.started,
@@ -479,7 +474,7 @@ function hostView() {
       answers: list.map((p) => ({ pseudo: p.pseudo, answer: p.body[i] === undefined ? null : p.body[i] })),
     },
     ranking: state.ranking
-      ? state.ranking.filter((r) => byId(r.id)).map((r) => ({ ...r, pseudo: byId(r.id).pseudo, word: byId(r.id).word, team: byId(r.id).team, score: scoreOf(byId(r.id)) }))
+      ? state.ranking.filter((r) => byId(r.id)).map((r) => ({ ...r, pseudo: byId(r.id).pseudo, word: byId(r.id).word, profile: byId(r.id).profile, score: scoreOf(byId(r.id)) }))
       : null,
     config: {
       updatedAt: state.config.updatedAt,
@@ -518,7 +513,7 @@ function hostView() {
         };
       }),
     },
-    closing: list.filter((p) => p.closing).sort((a, b) => a.closing.ts - b.closing.ts).map((p) => ({ pseudo: p.pseudo, text: p.closing.text, team: p.team })),
+    closing: list.filter((p) => p.closing).sort((a, b) => a.closing.ts - b.closing.ts).map((p) => ({ pseudo: p.pseudo, text: p.closing.text })),
   };
 }
 
@@ -563,7 +558,6 @@ function addBots(n) {
     if (used.has(name)) continue;
     const id = 'bot-' + crypto.randomUUID();
     const p = newPlayer(id, name, word, true);
-    if (state.ranking) p.team = smallestTeam();
     state.players.set(id, p);
     added++;
   }
@@ -629,7 +623,6 @@ io.on('connection', (socket) => {
     if (existing) { existing.pseudo = pseudo; existing.word = word; }
     else {
       const p = newPlayer(id, pseudo, word);
-      if (state.ranking) p.team = smallestTeam(); // arrivée tardive
       state.players.set(id, p);
     }
     socket.data.pid = id;

@@ -44,9 +44,9 @@
 
   function updateWho() {
     if (!S || !S.me) { $who.innerHTML = '<span class="conn ' + (socket.connected ? 'on' : '') + '"></span>'; return; }
-    const t = S.me.team;
+    const t = S.me.profile;
     $who.innerHTML = '<strong>' + esc(S.me.pseudo) + '</strong><span class="conn ' + (socket.connected ? 'on' : '') + '"></span>' +
-      (t ? '<br><span class="team-badge" style="background:' + t.color + '">' + esc(t.name) + '</span>' : '<br><span class="muted">' + esc(S.me.word) + '</span>');
+      (t ? '<br><span class="profile-badge" style="background:' + t.color + '">' + esc(t.name) + '</span>' : '<br><span class="muted">' + esc(S.me.word) + '</span>');
   }
 
   function render() {
@@ -56,7 +56,7 @@
     let key;
     if (!S.me) key = 'JOIN';
     else if (S.phase === 'BOUTEILLE_3') key = 'B3:' + (S.b3 ? S.b3.id : 'none');
-    else if (S.phase === 'CLASSEMENT') key = 'CLASSEMENT:' + (S.me.team ? S.me.team.key : '');
+    else if (S.phase === 'CLASSEMENT') key = 'CLASSEMENT:' + (S.me.profile ? S.me.profile.key : '');
     else key = S.phase;
     if (key !== mountedKey) {
       mountedKey = key;
@@ -179,22 +179,14 @@
     CLASSEMENT(root, s) {
       const r = s.ranking;
       if (!r) { root.innerHTML = head('Body Count', 'Classement') + '<p class="muted">Le classement arrive…</p>'; return; }
-      const t = s.me.team;
+      const t = s.me.profile;
       root.innerHTML =
         head('Body Count · résultats', 'Ton classement') +
         '<div class="card stats"><div><div class="label">Rang</div><div class="big-num">' + r.rank + '<sup style="font-size:1.4rem">' + (r.rank === 1 ? 'er' : 'e') + '</sup></div><div class="muted" style="font-size:.8rem">sur ' + r.total + '</div></div>' +
         '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« oui » sur ' + (r.of || 10) + '</div></div></div>' +
         (t
-          ? '<div class="card team-card" style="background:' + t.color + '"><div class="label">Ton équipe</div><h2>' + esc(t.name) + '</h2>' +
-            '<ul class="mates">' + (r.teammates.length ? r.teammates.map((m) => '<li>' + esc(m.pseudo) + ' · <em>' + esc(m.word) + '</em></li>').join('') : '<li>Tu es seul·e pour l’instant !</li>') + '</ul>' + sprig() + '</div>'
+          ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de dégustateur</div><h2>' + esc(t.name) + '</h2>' + sprig() + '</div>'
           : '');
-      return {
-        update(s) {
-          // les coéquipiers peuvent évoluer (arrivées tardives) : remonter l'écran si besoin
-          const n = s.ranking ? s.ranking.teammates.length : 0;
-          if (r && n !== r.teammates.length) { mountedKey = null; render(); }
-        },
-      };
     },
 
     /* ---------------- Bouteille 1 : Mot interdit ---------------- */
@@ -361,7 +353,7 @@
     RECAP(root, s) {
       const r = s.recap;
       if (!r) { root.innerHTML = '<p class="muted">Fiche indisponible.</p>'; return; }
-      const t = r.team;
+      const t = r.profile;
       const sec = (label, val) => '<div class="recap-sec"><div class="label">' + label + '</div><div class="val">' + val + '</div></div>';
       const none = '<small>—</small>';
       const voteTxt = r.vote
@@ -378,7 +370,7 @@
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
-        (t ? '<div class="recap-team" style="background:' + t.color + '"><span>' + esc(t.name) + '</span><span class="label">équipe</span></div>' : '') +
+        (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
         sec('Body Count', r.score === null ? none : r.score + ' « oui » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
         sec('Le Mot Interdit' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         sec('Le Match', voteTxt) +

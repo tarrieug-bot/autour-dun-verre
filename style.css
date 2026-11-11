@@ -18,7 +18,7 @@
   --glass: rgba(255, 226, 196, .045);
   --band: url('/band-whisky.jpg');
   --bgimg: url('/bg-whisky.jpg');
-  --team-1: #C2321C; --team-2: #C98A2E; --team-3: #6B3420;
+  --profile-1: #C2321C; --profile-2: #C98A2E; --profile-3: #6B3420;
 
   /* alias historiques utilisés dans le code */
   --indigo: var(--accent);
@@ -44,7 +44,7 @@ body[data-theme="champagne"] {
   --glass: rgba(255, 236, 196, .05);
   --band: url('/band-champagne.jpg');
   --bgimg: url('/bg-champagne.jpg');
-  --team-1: #B8742A; --team-2: #D9AE52; --team-3: #5E4220;
+  --profile-1: #B8742A; --profile-2: #D9AE52; --profile-3: #5E4220;
 }
 
 * { box-sizing: border-box; }
@@ -262,21 +262,18 @@ select.input option { background: var(--bg-2); }
 .progress { height: 2px; background: rgba(253,252,241,.12); margin-top: 10px; border-radius: 2px; overflow: hidden; }
 .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 10px var(--accent); transition: width .4s ease; }
 
-/* ---------- Classement / équipe ---------- */
+/* ---------- Classement / profil ---------- */
 .big-num { font-family: var(--serif); font-size: 4.2rem; line-height: 1; color: var(--cream); }
 .big-num sup { font-size: 1.4rem; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: center; }
 .stats > div + div { border-left: 1px solid var(--line); }
-.team-card { color: var(--cream); border: 1px solid rgba(255,255,255,.18); position: relative; overflow: hidden; }
-.team-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.12), transparent 50%); pointer-events: none; }
-.team-card h2, .team-card h3 { color: var(--cream); }
-.team-card h2 { font-size: 2.2rem; font-style: italic; }
-.team-card .label { color: rgba(253,252,241,.78); }
-.team-card .sprig { position: absolute; right: -6px; bottom: -4px; width: 140px; height: 50px; color: rgba(253,252,241,.28); }
-.team-badge { display: inline-block; padding: 3px 9px 1px; border-radius: 20px; color: var(--cream); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; }
-.mates { list-style: none; padding: 0; margin: 12px 0 0; }
-.mates li { padding: 9px 0 7px; border-bottom: 1px solid rgba(253,252,241,.18); }
-.mates li em { font-family: var(--serif); font-size: 1.05rem; }
+.profile-card { color: var(--cream); border: 1px solid rgba(255,255,255,.18); position: relative; overflow: hidden; }
+.profile-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.12), transparent 50%); pointer-events: none; }
+.profile-card h2, .profile-card h3 { color: var(--cream); }
+.profile-card h2 { font-size: 2.2rem; font-style: italic; }
+.profile-card .label { color: rgba(253,252,241,.78); }
+.profile-card .sprig { position: absolute; right: -6px; bottom: -4px; width: 140px; height: 50px; color: rgba(253,252,241,.28); }
+.profile-badge { display: inline-block; padding: 3px 9px 1px; border-radius: 20px; color: var(--cream); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; }
 
 /* ---------- Mot interdit ---------- */
 .forbidden { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
@@ -377,8 +374,8 @@ select.input option { background: var(--bg-2); }
 .recap-head h1 { font-size: 2.6rem; margin-top: 16px; font-style: italic; }
 .recap-head .word { font-family: var(--serif); font-style: italic; font-size: 1.15rem; color: var(--accent-2); }
 .recap-head .stamp { position: absolute; right: 10px; top: 10px; width: 64px; height: 64px; opacity: .95; color: var(--cream); filter: drop-shadow(0 0 4px rgba(0,0,0,.6)); }
-.recap-team { color: var(--cream); padding: 11px 20px 9px; font-family: var(--serif); font-style: italic; font-size: 1.3rem; display: flex; justify-content: space-between; align-items: center; }
-.recap-team .label { color: rgba(253,252,241,.85); }
+.recap-profile { color: var(--cream); padding: 12px 20px 10px; font-family: var(--serif); font-style: italic; font-size: 1.45rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+.recap-profile .label { color: rgba(253,252,241,.85); font-style: normal; font-size: .62rem; }
 .recap-sec { padding: 14px 20px 0; }
 .recap-sec + .recap-sec { border-top: 1px solid var(--line); margin-top: 14px; }
 .recap-sec .val { font-family: var(--serif); font-size: 1.35rem; color: var(--cream); line-height: 1.22; margin-top: 4px; }
