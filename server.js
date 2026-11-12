@@ -326,6 +326,7 @@ function sanitizeConfig(c, keepTime) {
       question: clean(p.question, 120) || DEFAULT_QUESTION,
       options: opts.map((o, i) => o || DEFAULT_OPTIONS[i]),
       correct: [0, 1, 2].includes(p.correct) ? p.correct : null,
+      explanation: clean(p.explanation, 300),
     });
   });
   return out;
@@ -517,6 +518,7 @@ function guestView(pid) {
         v.b3.counts = counts;
         v.b3.pct = percents(counts);
         v.b3.won = my === null ? null : my === r.correct;
+        v.b3.explanation = r.explanation || '';
       }
       break;
     }
@@ -559,6 +561,7 @@ function recapFor(p) {
         question: r.question,
         myOption: a !== undefined ? r.options[a] : null,
         correctOption: r.options[r.correct],
+        explanation: r.explanation || '',
         won: a === undefined ? null : a === r.correct,
       };
     });
@@ -637,7 +640,7 @@ function hostView() {
       rounds: state.b3.rounds.map((r, idx) => {
         const counts = roundCounts(r);
         return {
-          id: r.id, number: idx + 1, bottle: r.bottle, image: r.image, question: r.question, options: r.options, preset: r.preset,
+          id: r.id, number: idx + 1, bottle: r.bottle, image: r.image, question: r.question, options: r.options, preset: r.preset, explanation: r.explanation || '',
           locked: r.locked, revealed: r.revealed, correct: r.correct, counts, pct: percents(counts),
           names: [0, 1, 2].map((o) => list.filter((p) => r.answers[p.id] === o).map((p) => p.pseudo)),
         };
@@ -939,7 +942,7 @@ function hostAction(a) {
         const plan = state.config.paris.find((p) => p.id === a.planId);
         if (!plan) return { error: 'Pari préparé introuvable.' };
         const bt = bottleById(plan.bottleId);
-        a = { bottle: bt ? bt.name : '', imageUrl: bottleImg(bt), question: plan.question, options: plan.options, preset: plan.correct, planId: plan.id };
+        a = { bottle: bt ? bt.name : '', imageUrl: bottleImg(bt), question: plan.question, options: plan.options, preset: plan.correct, planId: plan.id, explanation: plan.explanation };
       }
       const opts = (Array.isArray(a.options) ? a.options : []).map((o) => clean(o, 40));
       if (opts.length !== 3 || opts.some((o) => !o)) return { error: 'Il faut exactement 3 options.' };
@@ -949,6 +952,7 @@ function hostAction(a) {
         image: a.imageUrl || (typeof a.image === 'string' && /^\/img\/[\w-]+$/.test(a.image) ? a.image : null),
         planId: a.planId || null,
         preset: [0, 1, 2].includes(a.preset) ? a.preset : null,
+        explanation: clean(a.explanation, 300),
         question: clean(a.question, 120) || DEFAULT_QUESTION,
         options: opts,
         answers: {},
@@ -980,6 +984,7 @@ function hostAction(a) {
       r.locked = true;
       r.correct = a.correct;
       r.revealed = true;
+      if (typeof a.explanation === 'string') r.explanation = clean(a.explanation, 300);
       return;
     }
     case 'b3Hide': {

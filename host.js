@@ -273,6 +273,7 @@
         '<label class="field"><span class="label">Question</span><input class="input" id="question"></label>' +
         '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' +
         [0, 1, 2].map((i) => '<label class="field"><span class="label">Option ' + (i + 1) + '</span><input class="input opt" required></label>').join('') + '</div>' +
+        '<label class="field"><span class="label">Explication (affichée à la révélation)</span><input class="input" id="expl0" maxlength="300"></label>' +
         '<button class="btn red" type="submit" id="launch">Lancer cette question</button></form></details>' +
         '<div class="card"><div class="label">Questions jouées</div><div class="round-hist" id="hist" style="margin-top:8px"></div></div>';
       const q = (id) => root.querySelector('#' + id);
@@ -292,10 +293,10 @@
       };
       q('cfg').onsubmit = async (e) => {
         e.preventDefault();
-        const r = await act('b3Launch', { bottle: q('bottle').value, image: imageUrl, question: q('question').value, options: opts.map((o) => o.value) });
+        const r = await act('b3Launch', { bottle: q('bottle').value, image: imageUrl, question: q('question').value, options: opts.map((o) => o.value), explanation: q('expl0').value });
         if (r.ok) {
           toast('Question lancée');
-          q('bottle').value = ''; q('img').value = ''; imageUrl = null; q('prev').classList.add('hidden');
+          q('bottle').value = ''; q('expl0').value = ''; q('img').value = ''; imageUrl = null; q('prev').classList.add('hidden');
         }
       };
 
@@ -332,15 +333,17 @@
               '<div style="display:flex;gap:16px;align-items:center;margin-top:8px">' + (r.image ? '<img src="' + esc(r.image) + '" style="height:90px;border:1px solid var(--or)">' : '') +
               '<div><h3>' + esc(r.bottle || 'Bouteille') + '</h3><div class="serif" style="font-style:italic;font-size:1.15rem">' + esc(r.question) + '</div></div></div>' +
               '<div id="opts"></div>' +
+              '<label class="field" style="margin:12px 0 0"><span class="label">Explication révélée aux invités (et reprise sur leur fiche)</span><input class="input" id="expl" maxlength="300" placeholder="ex. Son passage en fût de rhum lui donne des notes tropicales"></label>' +
               '<div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="lock"></button><button class="btn red" id="reveal">Révéler</button><button class="btn small ghost" id="hide">Masquer la révélation</button></div>' +
               '<p class="muted" style="font-size:.8rem">Coche la bonne réponse, puis « Révéler ». La révélation verrouille automatiquement.</p>';
             q('lock').onclick = () => act('b3Lock', { locked: !(H.b3.rounds.find((x) => x.id === H.b3.currentId) || {}).locked });
             q('reveal').onclick = () => {
               const c = root.querySelector('input[name="correct"]:checked');
               if (!c) return toast('Coche d’abord la bonne réponse');
-              act('b3Reveal', { correct: Number(c.value) });
+              act('b3Reveal', { correct: Number(c.value), explanation: q('expl').value });
             };
             q('hide').onclick = () => act('b3Hide');
+            q('expl').value = r.explanation || '';
             q('opts').innerHTML = r.options.map((o, i) =>
               '<label class="opt-radio"><input type="radio" name="correct" value="' + i + '"' + ((r.correct !== null ? r.correct : r.preset) === i ? ' checked' : '') + '>' +
               '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>' + esc(o) + '</strong><span data-c="' + i + '"></span></div><div data-n="' + i + '"></div></div></label>').join('');
@@ -519,6 +522,7 @@
         '<label class="field" style="margin:6px 0"><span class="label">Question ' + (i + 1) + ' · bouteille dégustée</span><select class="input" data-pb="' + i + '">' + bOpts(p.bottleId) + '</select></label>' +
         '<label class="field" style="margin:6px 0"><span class="label">Question</span><input class="input" data-pq="' + i + '"></label></div>' +
         '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' + [0, 1, 2].map((k) => '<label class="field" style="margin:6px 0"><span class="label">Option ' + (k + 1) + '</span><input class="input" data-po="' + i + ':' + k + '"></label>').join('') + '</div>' +
+        '<label class="field" style="margin:6px 0"><span class="label">Explication (affichée à la révélation et sur la fiche-souvenir)</span><input class="input" data-pe="' + i + '" maxlength="300" placeholder="ex. Son passage en fût de rhum lui donne des notes de fruits tropicaux"></label>' +
         '<div style="display:flex;gap:10px;align-items:end"><label class="field" style="margin:6px 0;flex:1"><span class="label">Bonne réponse (pré-cochée au moment de révéler)</span><select class="input" data-pc="' + i + '"><option value="">— je choisirai en direct —</option>' +
         [0, 1, 2].map((k) => '<option value="' + k + '"' + (p.correct === k ? ' selected' : '') + '>Option ' + (k + 1) + '</option>').join('') + '</select></label>' +
         '<button class="btn small ghost" data-pd="' + i + '" style="margin-bottom:6px">Supprimer</button></div></div>').join('')
@@ -529,12 +533,13 @@
         el.value = draft.paris[i].options[k];
         el.addEventListener('input', () => { draft.paris[i].options[k] = el.value; markDirty(); });
       });
+      root.querySelectorAll('[data-pe]').forEach((el) => { el.value = draft.paris[el.dataset.pe].explanation || ''; el.addEventListener('input', () => { draft.paris[el.dataset.pe].explanation = el.value; markDirty(); }); });
       root.querySelectorAll('[data-pb]').forEach((el) => { el.onchange = () => { draft.paris[el.dataset.pb].bottleId = el.value || null; markDirty(); }; });
       root.querySelectorAll('[data-pc]').forEach((el) => { el.onchange = () => { draft.paris[el.dataset.pc].correct = el.value === '' ? null : Number(el.value); markDirty(); }; });
       root.querySelectorAll('[data-pd]').forEach((el) => confirmBtn(el, 'Confirmer ?', () => { draft.paris.splice(Number(el.dataset.pd), 1); markDirty(); redraw(); }));
       q('#addPari').onclick = () => {
         const d = (H && H.b3 && H.b3.defaults) || { question: 'Quel est le prix de cette bouteille ?', options: ['Moins de 30€', 'Entre 30 et 60€', 'Plus de 60€'] };
-        draft.paris.push({ id: uid(), bottleId: null, question: d.question, options: d.options.slice(), correct: null });
+        draft.paris.push({ id: uid(), bottleId: null, question: d.question, options: d.options.slice(), correct: null, explanation: '' });
         markDirty(); redraw();
       };
 

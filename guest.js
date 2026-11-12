@@ -313,7 +313,9 @@
               : r.won
                 ? '<div class="verdict won"><div class="big">Bien vu !</div><span class="label">palais affûté</span></div>'
                 : '<div class="verdict lost"><div class="big">Raté…</div><span class="label">ce sera pour la prochaine</span></div>';
-            $('zone').innerHTML = verdict + '<div class="bars">' + r.options.map((o, i) =>
+            $('zone').innerHTML = verdict +
+              (r.explanation ? '<div class="explain"><span class="label gold">Le mot de l’animateur</span><p>' + esc(r.explanation) + '</p></div>' : '') +
+              '<div class="bars">' + r.options.map((o, i) =>
               '<div class="bar' + (i === r.correct ? ' correct' : '') + '"><div class="fill" style="width:' + r.pct[i] + '%"></div>' +
               '<div class="row"><span>' + esc(o) + (r.myAnswer === i ? ' <span class="muted">(toi)</span>' : '') + '</span>' +
               '<span>' + r.pct[i] + '%</span></div>' + (i === r.correct ? '<span class="tag tag-line">✓ bonne réponse</span>' : '') + '</div>').join('') + '</div>';
@@ -361,7 +363,7 @@
         ? esc(r.vote.label) + ' <small>· ' + (r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête') + '</small>'
         : none;
       const diffs = r.paris.length
-        ? r.paris.map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.myOption ? 'ma réponse : ' + esc(p.myOption) : 'pas de réponse') + '</small></span>' +
+        ? r.paris.map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.explanation ? esc(p.explanation) : 'bonne réponse : ' + esc(p.correctOption)) + '</small></span>' +
           (p.won === null ? '<span class="pill lost">—</span>' : '<span class="pill ' + (p.won ? 'won' : 'lost') + '">' + (p.won ? 'trouvé' : 'raté') + '</span>') + '</div>').join('')
         : none;
       const popKey = 'adv_recap_seen_' + s.sessionId + (slot ? '_' + slot : '');
@@ -385,7 +387,7 @@
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
-        sec('Mon profil', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
+        sec('Je n’ai jamais', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
         sec('Mon analyse de pro' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         '<div class="recap-sec"><div class="label">La différence</div><div style="margin-top:4px">' + diffs + '</div></div>' +
         sec('Ma dégustation préférée', voteTxt) +
