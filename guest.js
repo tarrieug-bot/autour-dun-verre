@@ -411,6 +411,8 @@
         (r.bottles || []).map((b, i) => '<div class="rb-item"><div class="rb-img">' + (b.image ? '<img src="' + esc(b.image) + '" alt="">' : '<span>' + (i + 1) + '</span>') + '<em>N° ' + (i + 1) + '</em></div><div class="rb-name">' + esc(b.name) + '</div></div>').join('') +
         '</div></article>';
       // Image story préparée à l’avance : le bouton partage immédiatement (exigence des téléphones)
+      // photos rognées : toutes les bouteilles à la même hauteur
+      root.querySelectorAll('.rb-img img').forEach((im) => { window.Story.trimSrc(im.getAttribute('src')).then((u) => { im.src = u; im.classList.add('trimmed'); }); });
       const btn = root.querySelector('#dlStory');
       let file = null;
       const label = (navigator.canShare ? 'Télécharger / partager mes 2 fiches' : 'Télécharger mes 2 fiches');

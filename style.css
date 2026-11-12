@@ -515,8 +515,9 @@ body.has-hero .topbar .brand { display: none; }
 .recap-bottles { padding: 14px 14px 16px; }
 .rb-grid { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .rb-item { text-align: center; min-width: 0; }
-.rb-img { position: relative; background: #FBF8F1; border: 1px solid var(--line); border-radius: 6px; aspect-ratio: 4 / 7; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-.rb-img img { max-width: 88%; max-height: 92%; object-fit: contain; }
+.rb-img { position: relative; background: #FFFFFF; border: 1px solid var(--line); border-radius: 6px; aspect-ratio: 4 / 7; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+.rb-img { align-items: flex-end; padding-bottom: 16px; box-sizing: border-box; }
+.rb-img img { max-width: 86%; height: 82%; object-fit: contain; object-position: center bottom; }
 .rb-img span { font-family: var(--serif); font-size: 2rem; color: rgba(18,6,4,.5); }
 .rb-img em { position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%); background: var(--accent-2); color: var(--bg); font-style: normal; font-size: .58rem; font-weight: 600; letter-spacing: .12em; padding: 4px 8px 2px; border-radius: 12px; white-space: nowrap; }
 .rb-name { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: .95rem; line-height: 1.2; }

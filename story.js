@@ -6,6 +6,38 @@
   const SANS = '"Josefin Sans", Futura, sans-serif';
 
   const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+  // Rogne la marge blanche (ou transparente) autour d'une photo de bouteille,
+  // pour que toutes les bouteilles aient le même cadrage.
+  function trim(img) {
+    if (!img || !img.naturalWidth) return img;
+    try {
+      const sc = Math.min(1, 400 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * sc)), h = Math.max(1, Math.round(img.naturalHeight * sc));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0, w, h);
+      const d = x.getImageData(0, 0, w, h).data;
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+        const i = (yy * w + xx) * 4;
+        const bg = d[i + 3] < 24 || (d[i] > 236 && d[i + 1] > 236 && d[i + 2] > 236);
+        if (!bg) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+      }
+      if (x1 < 0) return img;
+      const pad = 2;
+      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+      const sx = x0 / sc, sy = y0 / sc, sw = (x1 - x0 + 1) / sc, sh = (y1 - y0 + 1) / sc;
+      const out = document.createElement('canvas');
+      out.width = Math.round(sw); out.height = Math.round(sh);
+      out.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, out.width, out.height);
+      return out;
+    } catch (e) { return img; }
+  }
+  async function trimSrc(src) {
+    const img = await loadImg(src);
+    const t = trim(img);
+    return t && t.toDataURL ? t.toDataURL('image/png') : src;
+  }
   function loadImg(src) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -335,7 +367,8 @@
     await document.fonts.load('italic 500 60px "Bodoni Moda"').catch(() => {});
     const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
     const bottles = (r.bottles || []).filter(Boolean).slice(0, 8);
-    const [band, logo, ...photos] = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png'), ...bottles.map((b) => (b.image ? loadImg(b.image) : Promise.resolve(null)))]);
+    const [band, logo, ...raw] = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png'), ...bottles.map((b) => (b.image ? loadImg(b.image) : Promise.resolve(null)))]);
+    const photos = raw.map(trim);
     const C = {
       bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
       accent2: cssVar('--accent-2') || '#F59A45', gold: cssVar('--gold') || '#EDB867', cream: '#FDFCF1', soft: 'rgba(253,252,241,.66)',
@@ -404,7 +437,14 @@
     const maxLines = Math.max(1, ...bottles.map((b) => wrap(ctx, b.name, cw - 6, 3).length));
     const namesH = 46 + nameA + (maxLines - 1) * nameA * 1.35 + 20;
     const avail = (H - 300) - y;
-    const ch = Math.max(rows > 1 ? 240 : 360, Math.min(Math.round(cw * 2.4), Math.floor((avail - rows * namesH - (rows - 1) * rowGap) / rows)));
+    let ch = Math.max(rows > 1 ? 240 : 360, Math.min(Math.round(cw * 2.4), Math.floor((avail - rows * namesH - (rows - 1) * rowGap) / rows)));
+    // même hauteur pour toutes les bouteilles, posées sur la même ligne ; carte ajustée à la bouteille
+    const padX = 14, padTop = 30, padBot = 40;
+    const boxW = cw - 2 * padX;
+    const okP = photos.filter((im) => im && im.width > 0 && im.height > 0);
+    const bh = okP.length ? Math.min(ch - padTop - padBot, ...okP.map((im) => boxW * im.height / im.width)) : ch - padTop - padBot;
+    if (okP.length) ch = Math.round(bh + padTop + padBot);
+    const boxH = ch - padTop - padBot;
     const blockH = rows * (ch + namesH) + (rows - 1) * rowGap;
     const y0 = y + Math.max(0, Math.round((avail - blockH) / 2));
     bottles.forEach((b, i) => {
@@ -414,15 +454,13 @@
       const y = y0 + row * (ch + namesH + rowGap);
       // carte claire pour les photos sur fond blanc
       roundRect(ctx, x, y, cw, ch, 10);
-      ctx.fillStyle = '#FBF8F1'; ctx.fill();
+      ctx.fillStyle = '#FFFFFF'; ctx.fill();
       ctx.strokeStyle = 'rgba(237,184,103,.6)'; ctx.lineWidth = 2; ctx.stroke();
       const img = photos[i];
       if (img && img.width > 0 && img.height > 0) {
-        const pad = 16;
-        const sc = Math.min((cw - 2 * pad) / img.width, (ch - 2 * pad) / img.height);
-        const iw = img.width * sc, ih = img.height * sc;
+        const ih = bh, iw = img.width * bh / img.height;
         ctx.save(); roundRect(ctx, x + 2, y + 2, cw - 4, ch - 4, 8); ctx.clip();
-        ctx.drawImage(img, x + (cw - iw) / 2, y + (ch - ih) / 2, iw, ih);
+        ctx.drawImage(img, x + (cw - iw) / 2, y + padTop + (boxH - ih), iw, ih);
         ctx.restore();
       } else {
         ctx.fillStyle = 'rgba(18,6,4,.5)'; ctx.font = 'italic 500 90px ' + SERIF;
@@ -481,5 +519,5 @@
     return 'downloaded';
   }
 
-  window.Story = { draw, drawBottles, makeFiles, deliver };
+  window.Story = { draw, drawBottles, makeFiles, deliver, trimSrc };
 })();
