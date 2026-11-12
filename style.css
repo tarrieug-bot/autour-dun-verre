@@ -530,3 +530,7 @@ body.has-hero .topbar .brand { display: none; }
 .gender-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
 .gender-seg button { font: inherit; font-size: .82rem; letter-spacing: .04em; padding: 12px 6px; border-radius: 10px; border: 1px solid var(--line); background: rgba(253,252,241,.04); color: var(--cream, #FDFCF1); cursor: pointer; }
 .gender-seg button.on { background: var(--accent-2); border-color: var(--accent-2); color: var(--bg); font-weight: 600; }
+
+/* Photos de bouteilles : fond blanc, bouteille entière, même hauteur partout */
+.bottle-visual img { height: 230px; width: auto; max-width: 100%; object-fit: contain; background: #fff; padding: 14px 18px; box-sizing: border-box; }
+.pm-choice img { padding: 6px 4px; box-sizing: border-box; background: #fff; }

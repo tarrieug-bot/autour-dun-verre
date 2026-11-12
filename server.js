@@ -1,6 +1,7 @@
 /* Autour d'un Verre — serveur temps réel (état en mémoire, un seul événement). */
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -1067,6 +1068,16 @@ app.get('/:file', (req, res, next) => {
 });
 
 cloudLoad();
+// Garde-éveil : l'offre gratuite de Render met le service en veille après ~15 min sans visite,
+// et le réveil prend près d'une minute. On s'envoie une visite toutes les 10 min pour rester éveillé.
+// (Un seul service toujours allumé ≈ 744 h/mois, couvert par les 750 h gratuites.) KEEP_ALIVE=off pour désactiver.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL && process.env.KEEP_ALIVE !== 'off') {
+  setInterval(() => {
+    https.get(SELF_URL.replace(/\/$/, '') + '/healthz', (r) => r.resume()).on('error', () => {});
+  }, 10 * 60 * 1000).unref();
+}
+
 server.listen(PORT, () => {
   console.log(`Autour d'un Verre — http://localhost:${PORT}  (animateur : /host)`);
 });

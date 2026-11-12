@@ -62,5 +62,55 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) { /* idem */ } },
   };
 
-  window.UI = { esc, sprig, stamp, toast, uuid, store, applyTheme };
+  // ---------- Photos de bouteilles : marge blanche rognée partout (même cadrage pour toutes) ----------
+  const trimCache = new Map();
+  function trimUrl(src) {
+    if (trimCache.has(src)) return trimCache.get(src);
+    const p = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const W0 = img.naturalWidth, H0 = img.naturalHeight;
+          if (!W0 || !H0) return resolve(src);
+          const sc = Math.min(1, 400 / Math.max(W0, H0));
+          const w = Math.max(1, Math.round(W0 * sc)), h = Math.max(1, Math.round(H0 * sc));
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const x = c.getContext('2d', { willReadFrequently: true });
+          x.drawImage(img, 0, 0, w, h);
+          const d = x.getImageData(0, 0, w, h).data;
+          let x0 = w, y0 = h, x1 = -1, y1 = -1;
+          for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+            const i = (yy * w + xx) * 4;
+            if (d[i + 3] < 24 || (d[i] > 236 && d[i + 1] > 236 && d[i + 2] > 236)) continue;
+            if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy;
+          }
+          if (x1 < 0) return resolve(src);
+          x0 = Math.max(0, x0 - 2); y0 = Math.max(0, y0 - 2); x1 = Math.min(w - 1, x1 + 2); y1 = Math.min(h - 1, y1 + 2);
+          const sx = x0 / sc, sy = y0 / sc, sw = (x1 - x0 + 1) / sc, sh = (y1 - y0 + 1) / sc;
+          const out = document.createElement('canvas'); out.width = Math.round(sw); out.height = Math.round(sh);
+          const o = out.getContext('2d'); o.fillStyle = '#fff'; o.fillRect(0, 0, out.width, out.height);
+          o.drawImage(img, sx, sy, sw, sh, 0, 0, out.width, out.height);
+          resolve(out.toDataURL('image/jpeg', 0.9));
+        } catch (e) { resolve(src); }
+      };
+      img.onerror = () => resolve(src);
+      img.src = src;
+    });
+    trimCache.set(src, p);
+    return p;
+  }
+  function trimBottles(root) {
+    (root.querySelectorAll ? root.querySelectorAll('img[src^="/bottle/"]:not([data-trim])') : []).forEach((im) => {
+      const src = im.getAttribute('src');
+      im.setAttribute('data-trim', '1');
+      im.classList.add('bottle-photo');
+      trimUrl(src).then((u) => { if (im.getAttribute('src') === src) im.src = u; });
+    });
+  }
+  if (typeof MutationObserver !== 'undefined') {
+    const go = () => { trimBottles(document); new MutationObserver(() => trimBottles(document)).observe(document.body, { childList: true, subtree: true }); };
+    if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
+  }
+
+  window.UI = { esc, sprig, stamp, toast, uuid, store, applyTheme, trimUrl };
 })();

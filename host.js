@@ -314,7 +314,7 @@
             ? h.config.paris.map((p, i) => {
               const b = bt(p.bottleId);
               return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(253,252,241,.08)">' +
-                (b && b.image ? '<img src="' + esc(b.image) + '" style="height:44px;width:44px;object-fit:cover;border:1px solid var(--line)">' : '') +
+                (b && b.image ? '<img src="' + esc(b.image) + '" style="height:44px;width:44px;object-fit:contain;background:#fff;padding:2px;border:1px solid var(--line)">' : '') +
                 '<div style="flex:1"><strong>' + (i + 1) + '. ' + esc(b ? b.name : 'Bouteille ?') + '</strong><br><span class="muted" style="font-size:.82rem">' + esc(p.options.join(' / ')) + (p.correct !== null ? ' · bonne réponse : ' + esc(p.options[p.correct]) : '') + '</span></div>' +
                 '<button class="btn small ' + (p.played ? 'ghost' : '') + '" data-plan="' + esc(p.id) + '">' + (p.played ? 'Relancer' : 'Lancer') + '</button></div>';
             }).join('')
