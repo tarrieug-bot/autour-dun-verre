@@ -442,3 +442,27 @@ select.input option { background: var(--bg-2); }
 .thanks-card h2 { font-size: 2rem; margin: 6px 0 12px; }
 .thanks-card p { margin: 0 0 12px; line-height: 1.5; }
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+/* Typo à empattements plus pleine, alignée sur le logo (Bodoni Moda 500, contraste modéré) */
+body { font-variation-settings: 'opsz' 11; }
+.serif,
+h1, h2, h3, .title,
+.stamp .stamp-center,
+.hero .orga em,
+.chip em,
+.statement,
+.answer-row .btn .big,
+.big-num,
+.note p,
+.match .btn .big,
+.split > div,
+.verdict .big,
+.postcards .pc p,
+.recap-head .word,
+.recap-profile,
+.recap-sec .val,
+.pm-noimg,
+.pm-name,
+.pm-pct {
+  font-weight: 500;
+}
