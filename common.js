@@ -13,6 +13,12 @@
       '</svg>';
   }
 
+  /* Taille du mot central : il doit tenir dans le cercle intérieur (r = 33) avec une marge. */
+  function centerSize(word) {
+    const n = Math.max(1, String(word).length);
+    return Math.max(8, Math.min(17, Math.round((52 / (n * 0.5)) * 10) / 10));
+  }
+
   /* Sceau circulaire fin : MARTINIQUE · date · AUTOUR D'UN VERRE */
   let stampN = 0;
   function stamp(date, center) {
@@ -23,9 +29,7 @@
       '<circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-width=".8"/>' +
       '<circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" stroke-width=".8"/>' +
       '<text><textPath href="#' + id + '" textLength="266" lengthAdjust="spacing">' + esc(ring) + '</textPath></text>' +
-      '<g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">' +
-      '<path d="M50 44 L52 62 C53 68 67 68 68 62 L70 44 Z"/><path d="M52 53 L68 53" opacity=".6"/></g>' +
-      '<text class="stamp-center" x="60" y="82" text-anchor="middle">' + esc(center || 'santé') + '</text>' +
+      '<text class="stamp-center" x="60" y="60" text-anchor="middle" dominant-baseline="central" style="font-size:' + centerSize(center || 'santé') + 'px">' + esc(center || 'santé') + '</text>' +
       '</svg>';
   }
 
