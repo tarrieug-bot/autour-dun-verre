@@ -790,10 +790,10 @@ io.on('connection', (socket) => {
     socket.emit('host:state', hostView());
   });
 
-  socket.on('host:action', (msg, ack) => {
+  socket.on('host:action', async (msg, ack) => {
     if (!socket.data.isHost) return fail(ack, 'Non autorisé.');
     try {
-      const res = hostAction(msg || {});
+      const res = await hostAction(msg || {});
       if (res && res.error) return fail(ack, res.error);
       ok(ack, res || {});
       broadcast();
@@ -805,6 +805,25 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => broadcast());
 });
+
+/* Télécharge une image depuis un lien (photo de bouteille), réservé à l'animateur. */
+async function fetchImageAsDataUrl(url) {
+  let u;
+  try { u = new URL(String(url || '').trim()); } catch (e) { return { error: 'Lien invalide.' }; }
+  if (!/^https?:$/.test(u.protocol)) return { error: 'Lien invalide.' };
+  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|\[)/i.test(u.hostname)) return { error: 'Lien non autorisé.' };
+  try {
+    const res = await fetch(u, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0 (autour-dun-verre)' }, redirect: 'follow' });
+    if (!res.ok) return { error: 'Image introuvable (' + res.status + ').' };
+    const type = (res.headers.get('content-type') || '').split(';')[0].trim();
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(type)) return { error: 'Ce lien ne mène pas à une image (jpg, png, webp).' };
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > 6e6) return { error: 'Image trop lourde.' };
+    return { dataUrl: 'data:' + type + ';base64,' + buf.toString('base64') };
+  } catch (e) {
+    return { error: 'Téléchargement impossible.' };
+  }
+}
 
 function hostAction(a) {
   switch (a.type) {
@@ -841,6 +860,8 @@ function hostAction(a) {
       return;
     case 'getConfigFull':
       return { config: state.config };
+    case 'fetchImage':
+      return fetchImageAsDataUrl(a.url);
     case 'setConfig': {
       // keepTime : restauration depuis le navigateur (garde l'horodatage d'origine)
       state.config = sanitizeConfig(a.config, !!a.keepTime);

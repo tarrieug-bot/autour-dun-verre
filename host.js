@@ -477,6 +477,7 @@
         '<input class="input" data-bn="' + i + '" placeholder="Nom de la bouteille" style="flex:1">' +
         '<label class="btn small ghost" style="cursor:pointer">' + (b.image ? 'Changer la photo' : 'Photo') + '<input type="file" accept="image/*" data-bi="' + i + '" hidden></label>' +
         (b.image ? '<button class="btn small ghost" data-bx="' + i + '" title="Retirer la photo">Sans photo</button>' : '') +
+        '<input class="input" data-bu="' + i + '" placeholder="…ou colle le lien d’une photo" style="flex:0 1 230px;font-size:.85rem;padding:9px 10px">' +
         '<button class="x" data-bd="' + i + '" title="Supprimer" style="border:0;background:none;color:var(--encre-soft);font-size:1.2rem;cursor:pointer">×</button></div>').join('')
         : '<p class="muted" style="margin:6px 0 0">Aucune bouteille pour l’instant.</p>';
       root.querySelectorAll('[data-bn]').forEach((el) => {
@@ -489,6 +490,21 @@
           const f = el.files[0];
           if (!f) return;
           try { draft.bottles[el.dataset.bi].image = await resizeImage(f, 800, 0.8); markDirty(); redraw(); } catch (e) { toast('Image illisible'); }
+        });
+      });
+      root.querySelectorAll('[data-bu]').forEach((el) => {
+        el.addEventListener('change', async () => {
+          const url = el.value.trim();
+          if (!url) return;
+          el.disabled = true;
+          const r = await act('fetchImage', { url });
+          el.disabled = false;
+          if (!r.ok) return;
+          try {
+            const blob = await (await fetch(r.dataUrl)).blob();
+            draft.bottles[el.dataset.bu].image = await resizeImage(blob, 800, 0.8);
+            markDirty(); redraw(); toast('Photo récupérée ✓');
+          } catch (e) { toast('Image illisible'); }
         });
       });
       root.querySelectorAll('[data-bx]').forEach((el) => { el.onclick = () => { draft.bottles[el.dataset.bx].image = null; markDirty(); redraw(); }; });
