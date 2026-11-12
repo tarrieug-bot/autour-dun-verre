@@ -315,7 +315,7 @@
                 ? '<div class="verdict won"><div class="big">Bien vu !</div><span class="label">palais affûté</span></div>'
                 : '<div class="verdict lost"><div class="big">Raté…</div><span class="label">ce sera pour la prochaine</span></div>';
             $('zone').innerHTML = verdict +
-              (r.explanation ? '<div class="explain"><span class="label gold">Le mot de l’animateur</span><p>' + esc(r.explanation) + '</p></div>' : '') +
+              (r.explanation ? '<div class="explain"><span class="label gold">Le détail qui change tout</span><p>' + esc(r.explanation) + '</p></div>' : '') +
               '<div class="bars">' + r.options.map((o, i) =>
               '<div class="bar' + (i === r.correct ? ' correct' : '') + '"><div class="fill" style="width:' + r.pct[i] + '%"></div>' +
               '<div class="row"><span>' + esc(o) + (r.myAnswer === i ? ' <span class="muted">(toi)</span>' : '') + '</span>' +
