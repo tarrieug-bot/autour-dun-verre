@@ -113,9 +113,9 @@ const LEGACY_STATEMENTS = new Map([
 
 // Profils de dégustateur : résultat personnel du Body Count (tiers du classement)
 const PROFILES = [
-  { key: 'epicurieux', name: 'Les Épicurieux', color: 'var(--profile-1)' },
-  { key: 'amateurs', name: 'Les Amateurs Éclairés', color: 'var(--profile-2)' },
-  { key: 'sages', name: 'Les Sages du Bar', color: 'var(--profile-3)' },
+  { key: 'epicurieux', name: 'L’Épicurieux·se', color: 'var(--profile-1)' },
+  { key: 'amateurs', name: 'L’Amateur·rice Éclairé·e', color: 'var(--profile-2)' },
+  { key: 'sages', name: 'Le·la Sage du Bar', color: 'var(--profile-3)' },
 ];
 
 const DEFAULT_FORBIDDEN = ['bon', 'fort', 'sucré', 'sympa', 'bien'];

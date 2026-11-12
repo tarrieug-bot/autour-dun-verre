@@ -1,6 +1,7 @@
 /* Vue invité */
 (function () {
   const { esc, sprig, stamp, toast, uuid, store, applyTheme } = window.UI;
+  const midDot = (t) => esc(t).replace(/\S*·\S*/g, (w) => '<span class="nw">' + w.replace(/·/g, '<span class="mid">·</span>') + '</span>'); // point médian aéré dans les titres en italique
 
   // ?slot=2 permet d'ouvrir plusieurs invités de test dans le même navigateur
   const slot = new URLSearchParams(location.search).get('slot');
@@ -187,7 +188,7 @@
         '<div class="card stats"><div><div class="label">Rang</div><div class="big-num">' + r.rank + '<sup style="font-size:1.4rem">' + (r.rank === 1 ? 'er' : 'e') + '</sup></div><div class="muted" style="font-size:.8rem">sur ' + r.total + '</div></div>' +
         '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« j’ai déjà » sur ' + (r.of || 10) + '</div></div></div>' +
         (t
-          ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de dégustateur</div><h2>' + esc(t.name) + '</h2>' + sprig() + '</div>'
+          ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de dégustateur</div><h2>' + midDot(t.name) + '</h2>' + sprig() + '</div>'
           : '');
     },
 
@@ -389,7 +390,7 @@
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
-        (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
+        (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + midDot(t.name) + '</span></div>' : '') +
         sec('Mon analyse de pro' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         '<div class="recap-sec"><div class="label">La différence</div><div style="margin-top:4px">' + diffs + '</div></div>' +
         sec('Ma dégustation préférée', voteTxt) +

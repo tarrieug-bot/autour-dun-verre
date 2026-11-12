@@ -119,6 +119,26 @@
     }
     let y = 0;
     /* Écrit une ou plusieurs lignes à partir du curseur y (haut du bloc), puis avance le curseur. */
+    // Écriture inclusive : le point médian de Bodoni est placé trop haut et touche l'italique.
+    // On dessine un point rond centré sur la hauteur d'x, avec un peu d'air de chaque côté.
+    function midDots(str, x, base, font) {
+      ctx.font = font;
+      const fs = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)[1]);
+      const parts = str.split('·');
+      const dw = fs * 0.24;
+      const total = parts.reduce((w, p) => w + ctx.measureText(p).width, 0) + dw * (parts.length - 1);
+      const align = ctx.textAlign;
+      ctx.textAlign = 'left';
+      let cx = x - total / 2;
+      parts.forEach((p, i) => {
+        ctx.fillText(p, cx, base); cx += ctx.measureText(p).width;
+        if (i < parts.length - 1) {
+          ctx.beginPath(); ctx.arc(cx + dw * 0.55, base - fs * 0.24, fs * 0.05, 0, Math.PI * 2); ctx.fill();
+          cx += dw;
+        }
+      });
+      ctx.textAlign = align;
+    }
     function text(lines, font, opt) {
       const o = Object.assign({ align: 'center', x: W / 2, color: C.cream, spacing: 0, lead: 0.08, glow: null, tight: false }, opt || {});
       let { asc, desc } = metrics(font);
@@ -135,6 +155,7 @@
       lines.forEach((l, i) => {
         const base = y + asc + i * (lh + gapLine);
         if (o.spacing) spaced(ctx, l, o.x, base, o.spacing, o.align);
+        else if (o.dots && l.includes('·')) midDots(l, o.x, base, font);
         else ctx.fillText(l, o.x, base);
       });
       ctx.shadowBlur = 0;
@@ -220,7 +241,7 @@
       ctx.fillText = () => {};
       text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, tight: true });
       space(18, kh);
-      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true });
+      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true, dots: true });
       ctx.fillText = ctxFill;
       const h = y - y0 + ph(30);
       ctx.restore();
@@ -228,7 +249,7 @@
       y = yStart;
       text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)', tight: true });
       space(18, kh);
-      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true });
+      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true, dots: true });
       y = y0 + h;
     }
 
