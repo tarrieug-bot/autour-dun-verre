@@ -239,7 +239,7 @@
       const yStart = y;
       // mesure puis fond
       ctx.fillText = () => {};
-      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, tight: true });
+      text(['PROFIL DE ' + (r.gender === 'f' ? 'DÉGUSTATRICE' : r.gender === 'm' ? 'DÉGUSTATEUR' : 'DÉGUSTATEUR·RICE')], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, tight: true });
       space(18, kh);
       text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true, dots: true });
       ctx.fillText = ctxFill;
@@ -247,7 +247,7 @@
       ctx.restore();
       ctx.fillStyle = pc; ctx.fillRect(FRAME, y0, W - 2 * FRAME, h);
       y = yStart;
-      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)', tight: true });
+      text(['PROFIL DE ' + (r.gender === 'f' ? 'DÉGUSTATRICE' : r.gender === 'm' ? 'DÉGUSTATEUR' : 'DÉGUSTATEUR·RICE')], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)', tight: true });
       space(18, kh);
       text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true, dots: true });
       y = y0 + h;

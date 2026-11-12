@@ -524,3 +524,8 @@ body.has-hero .topbar .brand { display: none; }
 /* point médian (écriture inclusive) : un peu d'air pour ne pas toucher l'italique */
 .mid { display: inline-block; width: .1em; height: .1em; border-radius: 50%; background: currentColor; margin: 0 .07em 0 .1em; vertical-align: .2em; overflow: hidden; text-indent: -9em; }
 .nw { white-space: nowrap; }
+
+/* Choix du genre à l'inscription */
+.gender-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+.gender-seg button { font: inherit; font-size: .82rem; letter-spacing: .04em; padding: 12px 6px; border-radius: 10px; border: 1px solid var(--line); background: rgba(253,252,241,.04); color: var(--cream, #FDFCF1); cursor: pointer; }
+.gender-seg button.on { background: var(--accent-2); border-color: var(--accent-2); color: var(--bg); font-weight: 600; }

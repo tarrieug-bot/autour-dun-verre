@@ -112,10 +112,12 @@ const LEGACY_STATEMENTS = new Map([
 ]);
 
 // Profils de dégustateur : résultat personnel du Body Count (tiers du classement)
+// Chaque invité choisit son genre à l'arrivée (f / m / n) : le nom du profil s'accorde.
+const GENDERS = ['f', 'm', 'n'];
 const PROFILES = [
-  { key: 'epicurieux', name: 'L’Épicurieux·se', color: 'var(--profile-1)' },
-  { key: 'amateurs', name: 'L’Amateur·rice Éclairé·e', color: 'var(--profile-2)' },
-  { key: 'sages', name: 'Le·la Sage du Bar', color: 'var(--profile-3)' },
+  { key: 'epicurieux', name: 'L’Épicurieux·se', names: { f: 'L’Épicurieuse', m: 'L’Épicurieux', n: 'L’Épicurieux·se' }, color: 'var(--profile-1)' },
+  { key: 'amateurs', name: 'L’Amateur·rice Éclairé·e', names: { f: 'L’Amatrice Éclairée', m: 'L’Amateur Éclairé', n: 'L’Amateur·rice Éclairé·e' }, color: 'var(--profile-2)' },
+  { key: 'sages', name: 'Le·la Sage du Bar', names: { f: 'La Sage du Bar', m: 'Le Sage du Bar', n: 'Le·la Sage du Bar' }, color: 'var(--profile-3)' },
 ];
 
 const DEFAULT_FORBIDDEN = ['bon', 'fort', 'sucré', 'sympa', 'bien'];
@@ -350,9 +352,9 @@ function matchCounts() {
   return { ch, counts, pct: percents(counts), total: counts.reduce((a, b) => a + b, 0) };
 }
 
-function newPlayer(id, pseudo, word, isBot = false) {
+function newPlayer(id, pseudo, word, isBot = false, gender = 'n') {
   return {
-    id, pseudo, word, isBot,
+    id, pseudo, word, isBot, gender: GENDERS.includes(gender) ? gender : 'n',
     order: ++state.joinCounter,
     joinedAt: Date.now(),
     body: {}, // index -> true/false
@@ -366,6 +368,13 @@ function newPlayer(id, pseudo, word, isBot = false) {
 const playersList = () => [...state.players.values()].sort((a, b) => a.order - b.order);
 const scoreOf = (p) => Object.values(p.body).filter((v) => v === true).length;
 const profileObj = (key) => PROFILES.find((t) => t.key === key) || null;
+const genderOf = (p) => (p && GENDERS.includes(p.gender) ? p.gender : 'n');
+/** Profil accordé au genre de l'invité. */
+function profileFor(p) {
+  const t = p && profileObj(p.profile);
+  if (!t) return null;
+  return { key: t.key, color: t.color, name: t.names[genderOf(p)] || t.name };
+}
 
 function connectedIds() {
   const set = new Set();
@@ -440,7 +449,7 @@ function guestView(pid) {
     event: { ...state.config.event },
     playerCount: list.length,
     me: p
-      ? { id: p.id, pseudo: p.pseudo, word: p.word, profile: profileObj(p.profile) }
+      ? { id: p.id, pseudo: p.pseudo, word: p.word, gender: genderOf(p), profile: profileFor(p) }
       : null,
   };
 
@@ -568,7 +577,8 @@ function recapFor(p) {
   return {
     pseudo: p.pseudo,
     word: p.word,
-    profile: profileObj(p.profile),
+    gender: genderOf(p),
+    profile: profileFor(p),
     score: state.body.started ? scoreOf(p) : null,
     of: state.body.list.length,
     rank: rankOf(p.id),
@@ -691,7 +701,7 @@ function addBots(n) {
     if (added >= n) break;
     if (used.has(name)) continue;
     const id = 'bot-' + crypto.randomUUID();
-    const p = newPlayer(id, name, word, true);
+    const p = newPlayer(id, name, word, true, GENDERS[Math.floor(Math.random() * 3)]);
     state.players.set(id, p);
     added++;
   }
@@ -751,12 +761,14 @@ io.on('connection', (socket) => {
     if (!id || id.startsWith('bot-')) return fail(ack, 'Identifiant invalide, recharge la page.');
     if (!pseudo) return fail(ack, 'Choisis un pseudo.');
     if (!word) return fail(ack, 'Ajoute un mot qui te décrit.');
+    const gender = msg && GENDERS.includes(msg.gender) ? msg.gender : null;
+    if (!gender) return fail(ack, 'Choisis comment on s’adresse à toi.');
     const existing = state.players.get(id);
     const taken = playersList().some((p) => p.id !== id && p.pseudo.toLocaleLowerCase('fr') === pseudo.toLocaleLowerCase('fr'));
     if (taken) return fail(ack, 'Ce pseudo est déjà pris, choisis-en un autre.');
-    if (existing) { existing.pseudo = pseudo; existing.word = word; }
+    if (existing) { existing.pseudo = pseudo; existing.word = word; existing.gender = gender; }
     else {
-      const p = newPlayer(id, pseudo, word);
+      const p = newPlayer(id, pseudo, word, false, gender);
       state.players.set(id, p);
     }
     socket.data.pid = id;

@@ -1,6 +1,7 @@
 /* Vue invité */
 (function () {
   const { esc, sprig, stamp, toast, uuid, store, applyTheme } = window.UI;
+  const degust = (g) => (g === 'f' ? 'dégustatrice' : g === 'm' ? 'dégustateur' : 'dégustateur·rice');
   const midDot = (t) => esc(t).replace(/\S*·\S*/g, (w) => '<span class="nw">' + w.replace(/·/g, '<span class="mid">·</span>') + '</span>'); // point médian aéré dans les titres en italique
 
   // ?slot=2 permet d'ouvrir plusieurs invités de test dans le même navigateur
@@ -94,6 +95,9 @@
         '<div class="label gold center" style="margin-bottom:4px">Rejoins la table</div>' +
         '<label class="field"><span class="label">Ton pseudo</span><input class="input" id="pseudo" maxlength="24" required placeholder="ex. Doudou"></label>' +
         '<label class="field"><span class="label">Un mot qui te décrit</span><input class="input" id="word" maxlength="24" required placeholder="ex. curieuse"></label>' +
+        '<div class="field"><span class="label">Je suis</span><div class="gender-seg" id="gender" role="radiogroup">' +
+        [['f', 'Une femme'], ['m', 'Un homme'], ['n', 'Neutre']].map((g) => '<button type="button" role="radio" data-g="' + g[0] + '">' + g[1] + '</button>').join('') +
+        '</div><small class="muted" style="display:block;margin-top:6px;font-size:.72rem">Pour accorder ton profil et tes fiches.</small></div>' +
         '<button class="btn block" type="submit">Rejoindre la table</button>' +
         '<div class="error" id="joinErr"></div></form>' +
         '<p class="center muted" style="font-size:.8rem">Aucun compte nécessaire. Garde cette page ouverte pendant la soirée.</p>';
@@ -102,13 +106,19 @@
       const wd = root.querySelector('#word');
       ps.value = store.get('adv_last_pseudo') || '';
       wd.value = store.get('adv_last_word') || '';
+      let gender = store.get('adv_last_gender') || null;
+      const seg = root.querySelector('#gender');
+      const paint = () => seg.querySelectorAll('button').forEach((b) => { const on = b.dataset.g === gender; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      seg.addEventListener('click', (e) => { const b = e.target.closest('button[data-g]'); if (b) { gender = b.dataset.g; paint(); } });
+      paint();
       f.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = f.querySelector('button');
+        if (!gender) { root.querySelector('#joinErr').textContent = 'Choisis comment on s’adresse à toi.'; return; }
+        const btn = f.querySelector('button[type=submit]');
         btn.disabled = true;
-        const res = await send('guest:join', { id: myId, pseudo: ps.value, word: wd.value });
+        const res = await send('guest:join', { id: myId, pseudo: ps.value, word: wd.value, gender });
         btn.disabled = false;
-        if (res.ok) { store.set('adv_last_pseudo', ps.value.trim()); store.set('adv_last_word', wd.value.trim()); }
+        if (res.ok) { store.set('adv_last_pseudo', ps.value.trim()); store.set('adv_last_word', wd.value.trim()); store.set('adv_last_gender', gender); }
         else root.querySelector('#joinErr').textContent = res.error || '';
       });
     },
@@ -188,7 +198,7 @@
         '<div class="card stats"><div><div class="label">Rang</div><div class="big-num">' + r.rank + '<sup style="font-size:1.4rem">' + (r.rank === 1 ? 'er' : 'e') + '</sup></div><div class="muted" style="font-size:.8rem">sur ' + r.total + '</div></div>' +
         '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« j’ai déjà » sur ' + (r.of || 10) + '</div></div></div>' +
         (t
-          ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de dégustateur</div><h2>' + midDot(t.name) + '</h2>' + sprig() + '</div>'
+          ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de ' + degust(s.me.gender) + '</div><h2>' + midDot(t.name) + '</h2>' + sprig() + '</div>'
           : '');
     },
 
@@ -390,7 +400,7 @@
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
-        (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + midDot(t.name) + '</span></div>' : '') +
+        (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de ' + degust(r.gender) + '</span><span>' + midDot(t.name) + '</span></div>' : '') +
         sec('Mon analyse de pro' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         '<div class="recap-sec"><div class="label">La différence</div><div style="margin-top:4px">' + diffs + '</div></div>' +
         sec('Ma dégustation préférée', voteTxt) +
