@@ -482,3 +482,30 @@ h1, h2, h3, .title,
 .orga-top.small em { font-size: .95rem; }
 body.has-hero .topbar { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; min-height: 0; }
 body.has-hero .topbar .brand { display: none; }
+
+/* ---------- Fiche récap compacte (tient sur un écran de téléphone) ---------- */
+.dl-zone { margin: 0 0 14px; }
+.dl-hint { font-size: .8rem; margin: 8px 6px 0; text-wrap: balance; }
+.recap { margin: 0 0 14px; padding-bottom: 12px; }
+.recap-head { padding: 0 16px 12px; }
+.recap-head .orga-top.small { padding: 10px 0 6px; }
+.recap-head .band { height: 64px; margin: 0 -16px; }
+.recap-head .logo { width: 42%; margin: -26px auto 4px; }
+.recap-head .label { font-size: .62rem; }
+.recap-head h1 { font-size: 1.9rem; margin-top: 8px; }
+.recap-head .word { font-size: 1rem; }
+.recap-head .stamp { width: 52px; height: 52px; top: 8px; right: 8px; }
+.recap-profile { padding: 7px 16px 6px; font-size: 1.15rem; }
+.recap-profile .label { font-size: .56rem; }
+.recap-sec { padding: 8px 16px 0; }
+.recap-sec + .recap-sec { margin-top: 8px; }
+.recap-sec .label { font-size: .6rem; }
+.recap-sec .val { font-size: 1.05rem; margin-top: 2px; }
+.recap-sec .val small { font-size: .68rem; }
+.pari-line { padding: 3px 0; }
+.pari-line span { font-size: .85rem; }
+.pari-line small { font-size: .7rem; }
+.pill { font-size: .56rem; padding: 3px 7px 1px; }
+.recap-foot { padding: 8px 16px 0; }
+.recap-foot .sprig { width: 64px; height: 22px; }
+.recap-foot .label { font-size: .58rem; }

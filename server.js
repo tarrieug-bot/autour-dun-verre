@@ -8,7 +8,7 @@ const QRCode = require('qrcode');
 const { Server } = require('socket.io');
 // Les fichiers du site peuvent être dans ./public ou à la racine (dépôt « à plat »)
 const PUB = fs.existsSync(path.join(__dirname, 'public', 'index.html')) ? path.join(__dirname, 'public') : __dirname;
-const STATIC_FILES = ['index.html', 'host.html', 'style.css', 'common.js', 'shared.js', 'guest.js', 'host.js',
+const STATIC_FILES = ['index.html', 'host.html', 'style.css', 'common.js', 'shared.js', 'guest.js', 'host.js', 'story.js',
   'logo.png', 'bodoni.woff2', 'bodoni-italic.woff2', 'josefin-300.woff2', 'josefin-400.woff2', 'josefin-600.woff2',
   'band-whisky.jpg', 'band-champagne.jpg', 'bg-whisky.jpg', 'bg-champagne.jpg'];
 const { findForbidden } = require(path.join(PUB, 'shared.js'));

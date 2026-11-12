@@ -375,13 +375,14 @@
           '<img src="/logo.png" alt="" class="thanks-logo">' +
           '<h2>Merci <em>' + esc(r.pseudo) + '</em> !</h2>' +
           '<p>Merci d’avoir participé à cette soirée.<br>Ta fiche‑souvenir t’attend juste derrière.</p>' +
-          '<p class="muted" style="font-size:.88rem">Ferme cette fenêtre pour la découvrir, puis fais une capture d’écran pour la garder en souvenir.</p>' +
+          '<p class="muted" style="font-size:.88rem">Ferme cette fenêtre pour la découvrir, puis télécharge‑la au format story pour la garder et la partager.</p>' +
           '<button class="btn block" id="thanksClose">Découvrir ma fiche</button></div>';
         document.body.appendChild(ov);
         ov.querySelector('#thanksClose').onclick = () => { store.set(popKey, '1'); const tt = document.querySelector('.toast'); if (tt) tt.classList.remove('show'); ov.classList.add('out'); setTimeout(() => ov.remove(), 300); window.scrollTo(0, 0); };
       }
       root.innerHTML =
-        '<p class="center label" style="margin-bottom:10px">Ta fiche‑souvenir · fais une capture d’écran</p>' +
+        '<div class="dl-zone"><button class="btn block" id="dlStory" disabled>Préparation de ta fiche…</button>' +
+        '<p class="center muted dl-hint">Télécharge ta fiche‑souvenir au format story pour la garder et la partager sur Instagram.</p></div>' +
         '<article class="recap">' +
         '<div class="recap-head">' + (s.event.orga ? '<div class="orga-top small"><span>' + esc(s.event.orga) + '</span><em>vous font Vivre</em></div>' : '') + '<div class="band"></div><img class="logo" src="/logo.png" alt="">' +
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
@@ -395,6 +396,19 @@
         sec('Mon mot de la soirée', r.closing ? '« ' + esc(r.closing) + ' »' : none) +
         '<div class="recap-foot">' + sprig() + '<span class="label">' + (s.event.place ? esc(s.event.place.split('·')[0].trim()) + '<br>' : '') + 'Martinique</span></div>' +
         '</article>';
+      // Image story préparée à l’avance : le bouton partage immédiatement (exigence des téléphones)
+      const btn = root.querySelector('#dlStory');
+      let file = null;
+      const label = (navigator.canShare ? 'Télécharger / partager ma fiche' : 'Télécharger ma fiche');
+      if (window.Story) {
+        window.Story.makeFile(s, r).then((f) => { file = f; btn.disabled = false; btn.textContent = label; })
+          .catch(() => { btn.textContent = 'Fiche indisponible'; });
+      } else btn.textContent = 'Fiche indisponible';
+      btn.onclick = async () => {
+        if (!file) return;
+        const res = await window.Story.deliver(file);
+        if (res === 'downloaded') toast('Fiche téléchargée ✓');
+      };
     },
   };
 })();
