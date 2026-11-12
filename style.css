@@ -1,7 +1,8 @@
 /* Autour d'un Verre — DA « verre ambré »
    Thèmes : body[data-theme="whisky"] (défaut) / body[data-theme="champagne"] */
-@font-face { font-family: 'Bodoni Moda'; src: url('/bodoni.woff2') format('woff2'); font-weight: 400 900; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Bodoni Moda'; src: url('/bodoni-italic.woff2') format('woff2'); font-weight: 400 900; font-style: italic; font-display: swap; }
+/* Bodoni Moda figée (graisse 500, contraste modéré) : rendu identique sur le site et dans l’image story */
+@font-face { font-family: 'Bodoni Moda'; src: url('/bodoni-av.woff2') format('woff2'); font-weight: 400 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Bodoni Moda'; src: url('/bodoni-av-italic.woff2') format('woff2'); font-weight: 400 900; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Josefin Sans'; src: url('/josefin-300.woff2') format('woff2'); font-weight: 300; font-display: swap; }
 @font-face { font-family: 'Josefin Sans'; src: url('/josefin-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Josefin Sans'; src: url('/josefin-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }

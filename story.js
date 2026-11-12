@@ -1,10 +1,11 @@
-/* Fiche-souvenir au format story (1080 × 1920), dessinée dans un canvas. */
+/* Fiche-souvenir au format story (1080 × 1920), dessinée dans un canvas.
+   Mise en page « au curseur » : chaque ligne est mesurée, avec toujours un écart entre deux lignes. */
 (function () {
-  const W = 1080, H = 1920, M = 90;
+  const W = 1080, H = 1920, M = 90, FRAME = 36;
+  const SERIF = '"Bodoni Moda", Didot, Georgia, serif';
+  const SANS = '"Josefin Sans", Futura, sans-serif';
 
-  function cssVar(name) {
-    return getComputedStyle(document.body).getPropertyValue(name).trim();
-  }
+  const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
   function loadImg(src) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -13,20 +14,26 @@
       img.src = src;
     });
   }
-  /* Texte avec espacement des lettres (compatible tous navigateurs) */
+  function cover(ctx, img, x, y, w, h) {
+    const s = Math.max(w / img.width, h / img.height);
+    const iw = img.width * s, ih = img.height * s;
+    ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+  }
+  function spacedWidth(ctx, text, spacing) {
+    const chars = [...text];
+    return chars.reduce((a, c) => a + ctx.measureText(c).width, 0) + spacing * Math.max(0, chars.length - 1);
+  }
   function spaced(ctx, text, x, y, spacing, align) {
     const chars = [...text];
-    const widths = chars.map((c) => ctx.measureText(c).width);
-    const total = widths.reduce((a, b) => a + b, 0) + spacing * Math.max(0, chars.length - 1);
+    const total = spacedWidth(ctx, text, spacing);
     let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
     const prev = ctx.textAlign;
     ctx.textAlign = 'left';
-    chars.forEach((c, i) => { ctx.fillText(c, cx, y); cx += widths[i] + spacing; });
+    for (const c of chars) { ctx.fillText(c, cx, y); cx += ctx.measureText(c).width + spacing; }
     ctx.textAlign = prev;
-    return total;
   }
   function wrap(ctx, text, maxW, maxLines) {
-    const words = String(text).split(/\s+/);
+    const words = String(text).split(/\s+/).filter(Boolean);
     const lines = [];
     let line = '';
     for (const w of words) {
@@ -41,206 +48,7 @@
       kept[maxLines - 1] = last.replace(/[\s,;.]+$/, '') + '…';
       return kept;
     }
-    return lines;
-  }
-  function cover(ctx, img, x, y, w, h) {
-    const s = Math.max(w / img.width, h / img.height);
-    const iw = img.width * s, ih = img.height * s;
-    ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
-  }
-  const SERIF = '"Bodoni Moda", Didot, Georgia, serif';
-  const SANS = '"Josefin Sans", Futura, sans-serif';
-
-  async function draw(s, r) {
-    for (const k of [1, 0.92, 0.84, 0.76, 0.68, 0.6]) {
-      const res = await drawOnce(s, r, k);
-      if (res.bottom <= H - 130) return res.canvas;
-      if (k === 0.6) return res.canvas;
-    }
-  }
-
-  async function drawOnce(s, r, k) {
-    await Promise.all([
-      document.fonts.load('500 60px "Bodoni Moda"'),
-      document.fonts.load('italic 500 60px "Bodoni Moda"'),
-      document.fonts.load('400 30px "Josefin Sans"'),
-      document.fonts.load('600 30px "Josefin Sans"'),
-    ]).catch(() => {});
-    const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
-    const [band, bg, logo] = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/bg-' + theme + '.jpg'), loadImg('/logo.png')]);
-    const C = {
-      bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
-      accent2: cssVar('--accent-2') || '#F59A45', gold: cssVar('--gold') || '#EDB867', cream: '#FDFCF1',
-    };
-    const cv = document.createElement('canvas');
-    cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
-    ctx.textBaseline = 'alphabetic';
-
-    // Fond
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, C.bg2); g.addColorStop(0.5, C.bg); g.addColorStop(1, C.bg);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    if (bg) { ctx.globalAlpha = 0.35; cover(ctx, bg, 0, 0, W, H); ctx.globalAlpha = 1; }
-    const veil = ctx.createLinearGradient(0, 0, 0, H);
-    veil.addColorStop(0, 'rgba(0,0,0,.25)'); veil.addColorStop(0.45, 'rgba(0,0,0,.55)'); veil.addColorStop(1, 'rgba(0,0,0,.7)');
-    ctx.fillStyle = veil; ctx.fillRect(0, 0, W, H);
-
-    // Cadre fin
-    ctx.strokeStyle = 'rgba(237,184,103,.45)'; ctx.lineWidth = 2;
-    ctx.strokeRect(36, 36, W - 72, H - 72);
-
-    ctx.textAlign = 'center';
-    let y = 120;
-    // Signature organisateurs
-    if (s.event.orga) {
-      ctx.fillStyle = C.cream; ctx.font = '400 30px ' + SANS;
-      spaced(ctx, s.event.orga.toUpperCase(), W / 2, y, 6, 'center');
-      ctx.font = 'italic 500 44px ' + SERIF;
-      ctx.fillText('vous font Vivre', W / 2, y + 54);
-      y += Math.max(84, Math.round(90 * k));
-    }
-    // Bandeau visuel + logo
-    const bandY = y, bandH = Math.round(360 * k);
-    if (band) {
-      ctx.save(); ctx.beginPath(); ctx.rect(38, bandY, W - 76, bandH); ctx.clip();
-      cover(ctx, band, 0, bandY, W, bandH);
-      const fade = ctx.createLinearGradient(0, bandY + bandH * 0.35, 0, bandY + bandH);
-      fade.addColorStop(0, 'rgba(18,6,4,0)'); fade.addColorStop(1, C.bg);
-      ctx.fillStyle = fade; ctx.fillRect(0, bandY, W, bandH);
-      ctx.restore();
-    }
-    if (logo) {
-      const lw = Math.round(560 * Math.max(k, 0.8)), lh = (logo.height / logo.width) * lw;
-      ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 24;
-      ctx.drawImage(logo, (W - lw) / 2, bandY + bandH - lh * 0.62, lw, lh);
-      ctx.shadowBlur = 0;
-      y = bandY + bandH - lh * 0.62 + lh + Math.round(58 * k);
-    } else y = bandY + bandH + 40;
-
-    if (s.event.subtitle) {
-      const sub = s.event.subtitle.toUpperCase();
-      let fs = 32, sp = 7;
-      ctx.font = '600 ' + fs + 'px ' + SANS;
-      while (spacedWidth(ctx, sub, sp) > W - 2 * M && fs > 18) { fs -= 1; sp = Math.max(3, sp - 0.3); ctx.font = '600 ' + fs + 'px ' + SANS; }
-      ctx.fillStyle = C.accent2;
-      ctx.shadowColor = C.accent; ctx.shadowBlur = 22;
-      spaced(ctx, sub, W / 2, y, sp, 'center');
-      ctx.shadowBlur = 0;
-      y += Math.max(44, Math.round(50 * k));
-    }
-    ctx.font = '400 26px ' + SANS; ctx.fillStyle = 'rgba(253,252,241,.72)';
-    const meta = [s.event.date, s.event.place].filter(Boolean).join(' · ').toUpperCase();
-    let mfs = 26;
-    while (spacedWidth(ctx, meta, 5) > W - 2 * M && mfs > 16) { mfs -= 1; ctx.font = '400 ' + mfs + 'px ' + SANS; }
-    spaced(ctx, meta, W / 2, y, 5, 'center');
-    y += Math.max(100, Math.round(118 * k));
-
-    // Pseudo + mot
-    ctx.fillStyle = C.cream; ctx.font = 'italic 500 ' + Math.round(104 * Math.max(k, 0.8)) + 'px ' + SERIF;
-    ctx.fillText(r.pseudo, W / 2, y);
-    y += Math.max(58, Math.round(62 * k));
-    ctx.fillStyle = C.accent2; ctx.font = 'italic 500 44px ' + SERIF;
-    ctx.fillText('« ' + r.word + ' »', W / 2, y);
-    y += Math.max(36, Math.round(46 * k));
-
-    // Profil
-    if (r.profile) {
-      const pc = getComputedStyle(document.body).getPropertyValue(r.profile.color.replace(/^var\((--[^)]+)\)$/, '$1')).trim() || C.accent;
-      ctx.fillStyle = pc; ctx.fillRect(38, y, W - 76, 140);
-      ctx.fillStyle = 'rgba(253,252,241,.85)'; ctx.font = '400 24px ' + SANS;
-      spaced(ctx, 'PROFIL DE DÉGUSTATEUR', W / 2, y + 48, 6, 'center');
-      ctx.fillStyle = C.cream; ctx.font = 'italic 500 60px ' + SERIF;
-      ctx.fillText(r.profile.name, W / 2, y + 112);
-      y += 140;
-    }
-
-    // Sections
-    ctx.textAlign = 'left';
-    const maxW = W - 2 * M;
-    const label = (t) => { ctx.fillStyle = 'rgba(253,252,241,.6)'; ctx.font = '400 24px ' + SANS; spaced(ctx, t.toUpperCase(), M, y, 5, 'left'); };
-    const rule = () => { ctx.strokeStyle = 'rgba(237,184,103,.3)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(W - M, y); ctx.stroke(); };
-    const gap = Math.round(30 * k);
-    const L = Math.max(48, Math.round(52 * k));
-    y += Math.round(70 * k);
-
-    // Je n'ai jamais
-    label('Je n’ai jamais');
-    y += L;
-    ctx.fillStyle = C.cream; ctx.font = '500 44px ' + SERIF;
-    const sc = r.score === null ? '—' : r.score + ' « j’ai déjà »';
-    ctx.fillText(sc, M, y);
-    if (r.score !== null) {
-      const w0 = ctx.measureText(sc).width;
-      ctx.font = '400 26px ' + SANS; ctx.fillStyle = 'rgba(253,252,241,.6)';
-      ctx.fillText('  sur ' + r.of + (r.rank ? ' · ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : ''), M + w0, y);
-    }
-    y += gap; rule(); y += L;
-
-    // Mon analyse de pro
-    label('Mon analyse de pro' + (r.bottle1 ? ' · ' + r.bottle1 : ''));
-    y += L;
-    ctx.fillStyle = C.cream; ctx.font = 'italic 500 38px ' + SERIF;
-    const nl = wrap(ctx, r.note1 ? '« ' + r.note1 + ' »' : '—', maxW, 3);
-    nl.forEach((l, i) => ctx.fillText(l, M, y + i * 48));
-    y += (nl.length - 1) * 48 + gap; rule(); y += 52;
-
-    // La différence
-    label('La différence');
-    y += L;
-    if (!r.paris.length) { ctx.fillStyle = C.cream; ctx.font = '500 38px ' + SERIF; ctx.fillText('—', M, y); y += 10; }
-    r.paris.slice(0, 3).forEach((p, i) => {
-      ctx.fillStyle = C.cream; ctx.font = '400 30px ' + SANS;
-      const name = wrap(ctx, p.bottle, maxW - 190, 1)[0];
-      ctx.fillText(name, M, y);
-      // pastille
-      const txt = p.won === null ? '—' : p.won ? 'TROUVÉ' : 'RATÉ';
-      ctx.font = '600 22px ' + SANS;
-      const tw = spacedWidth(ctx, txt, 4) + 36;
-      const px = W - M - tw, py = y - 30;
-      roundRect(ctx, px, py, tw, 42, 21);
-      if (p.won) { ctx.fillStyle = C.accent2; ctx.fill(); ctx.fillStyle = C.bg; } else { ctx.strokeStyle = 'rgba(253,252,241,.35)'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'rgba(253,252,241,.65)'; }
-      spaced(ctx, txt, px + tw / 2, y - 1, 4, 'center');
-      if (p.explanation) {
-        ctx.fillStyle = 'rgba(253,252,241,.6)'; ctx.font = '400 24px ' + SANS;
-        const el = wrap(ctx, p.explanation, maxW - 190, 1)[0];
-        ctx.fillText(el, M, y + 36);
-        y += 36;
-      }
-      y += i < Math.min(3, r.paris.length) - 1 ? Math.round(58 * k) : 0;
-    });
-    y += gap; rule(); y += L;
-
-    // Ma dégustation préférée
-    label('Ma dégustation préférée');
-    y += L;
-    ctx.fillStyle = C.cream; ctx.font = '500 40px ' + SERIF;
-    if (r.vote) {
-      const vl = wrap(ctx, r.vote.label, maxW, 1)[0];
-      ctx.fillText(vl, M, y);
-      y += 38;
-      ctx.font = '400 24px ' + SANS; ctx.fillStyle = 'rgba(253,252,241,.6)';
-      ctx.fillText(r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête', M, y);
-    } else ctx.fillText('—', M, y);
-    y += gap; rule(); y += L;
-
-    // Mon mot
-    label('Mon mot de la soirée');
-    y += L;
-    ctx.fillStyle = C.cream; ctx.font = 'italic 500 40px ' + SERIF;
-    const ml = wrap(ctx, r.closing ? '« ' + r.closing + ' »' : '—', maxW, 2);
-    ml.forEach((l, i) => ctx.fillText(l, M, y + i * 50));
-    const bottom = y + (ml.length - 1) * 50;
-
-    // Pied
-    ctx.textAlign = 'center';
-    ctx.fillStyle = C.gold; ctx.font = '400 24px ' + SANS;
-    spaced(ctx, ('Martinique · ' + (s.event.date || '')).toUpperCase(), W / 2, H - 80, 7, 'center');
-
-    return { canvas: cv, bottom };
-  }
-  function spacedWidth(ctx, text, spacing) {
-    return [...text].reduce((a, c) => a + ctx.measureText(c).width, 0) + spacing * Math.max(0, [...text].length - 1);
+    return lines.length ? lines : [''];
   }
   function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -248,10 +56,257 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
+  async function draw(s, r) {
+    await Promise.all([
+      document.fonts.load('500 60px "Bodoni Moda"'),
+      document.fonts.load('italic 500 60px "Bodoni Moda"'),
+      document.fonts.load('400 30px "Josefin Sans"'),
+      document.fonts.load('600 30px "Josefin Sans"'),
+    ]).catch(() => {});
+    const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
+    const imgs = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png')]);
+    let last = null;
+    for (const k of [1, 0.94, 0.88, 0.82, 0.76, 0.7]) {
+      last = drawOnce(s, r, k, imgs);
+      if (last.bottom <= H - 140) return last.canvas;
+    }
+    return last.canvas;
+  }
+
+  function drawOnce(s, r, k, [band, logo]) {
+    const C = {
+      bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
+      accent2: cssVar('--accent-2') || '#F59A45', gold: cssVar('--gold') || '#EDB867', cream: '#FDFCF1',
+      soft: 'rgba(253,252,241,.66)', line: 'rgba(237,184,103,.32)',
+    };
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.textBaseline = 'alphabetic';
+    const px = (n) => Math.round(n * k);
+    const maxW = W - 2 * M;
+
+    // Mesures de ligne (ascendante / descendante réelles de la police)
+    function metrics(font) {
+      ctx.font = font;
+      const m = ctx.measureText('ÉÀHgjpq«»');
+      const asc = m.fontBoundingBoxAscent || m.actualBoundingBoxAscent || 0;
+      const desc = m.fontBoundingBoxDescent || m.actualBoundingBoxDescent || 0;
+      return { asc, desc };
+    }
+    let y = 0;
+    /* Écrit une ou plusieurs lignes à partir du curseur y (haut du bloc), puis avance le curseur. */
+    function text(lines, font, opt) {
+      const o = Object.assign({ align: 'center', x: W / 2, color: C.cream, spacing: 0, lead: 0.22, glow: null }, opt || {});
+      const { asc, desc } = metrics(font);
+      const lh = asc + desc;
+      const gapLine = Math.max(10, lh * o.lead);
+      ctx.fillStyle = o.color;
+      ctx.textAlign = o.align === 'center' ? 'center' : 'left';
+      if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = 22; }
+      lines.forEach((l, i) => {
+        const base = y + asc + i * (lh + gapLine);
+        if (o.spacing) spaced(ctx, l, o.x, base, o.spacing, o.align);
+        else ctx.fillText(l, o.x, base);
+      });
+      ctx.shadowBlur = 0;
+      y += lines.length * lh + (lines.length - 1) * gapLine;
+    }
+    const space = (n) => { y += Math.max(12, Math.round(n * k)); };
+    const fitSpaced = (str, weight, size, spacing, max) => {
+      let fs = size, sp = spacing;
+      ctx.font = weight + ' ' + fs + 'px ' + SANS;
+      while (spacedWidth(ctx, str, sp) > max && fs > 16) { fs -= 1; sp = Math.max(2, sp - 0.3); ctx.font = weight + ' ' + fs + 'px ' + SANS; }
+      return { font: weight + ' ' + fs + 'px ' + SANS, spacing: sp };
+    };
+
+    // ---------- Fond général ----------
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, C.bg2); g.addColorStop(0.45, C.bg); g.addColorStop(1, C.bg);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // ---------- Bloc du haut (le visuel du verre en fond est posé une fois sa hauteur connue) ----------
+    // On mesure d'abord le bloc à vide pour connaître sa hauteur, puis on dessine le fond et le texte.
+    const top = () => {
+      y = FRAME + px(70);
+      if (s.event.orga) {
+        const f = fitSpaced(s.event.orga.toUpperCase(), '400', px(30), 6, maxW);
+        text([s.event.orga.toUpperCase()], f.font, { spacing: f.spacing });
+        space(14);
+        text(['vous font Vivre'], 'italic 500 ' + px(46) + 'px ' + SERIF);
+        space(46);
+      }
+      if (logo) {
+        const lw = px(600), lh = (logo.height / logo.width) * lw;
+        if (drawing) {
+          ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 26;
+          ctx.drawImage(logo, (W - lw) / 2, y, lw, lh);
+          ctx.shadowBlur = 0;
+        }
+        y += lh;
+        space(40);
+      }
+      if (s.event.subtitle) {
+        const f = fitSpaced(s.event.subtitle.toUpperCase(), '600', px(32), 7, maxW);
+        if (drawing) text([s.event.subtitle.toUpperCase()], f.font, { spacing: f.spacing, color: C.accent2, glow: C.accent });
+        else text(['X'], f.font);
+        space(18);
+      }
+      const meta = [s.event.date, s.event.place].filter(Boolean).join(' · ').toUpperCase();
+      if (meta) {
+        const f = fitSpaced(meta, '400', px(26), 5, maxW);
+        if (drawing) text([meta], f.font, { spacing: f.spacing, color: C.soft }); else text(['X'], f.font);
+        space(56);
+      }
+      text([r.pseudo], 'italic 500 ' + px(104) + 'px ' + SERIF);
+      space(18);
+      text(['« ' + r.word + ' »'], 'italic 500 ' + px(44) + 'px ' + SERIF, { color: C.accent2 });
+      space(56);
+      return y;
+    };
+    let drawing = false;
+    const ctxFill = ctx.fillText; // mesure à vide : on neutralise l'écriture
+    ctx.fillText = () => {};
+    const topEnd = top();
+    ctx.fillText = ctxFill;
+
+    // Visuel du verre en fond du bloc du haut, opacité réduite + voile pour la lisibilité
+    if (band) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(FRAME, FRAME, W - 2 * FRAME, topEnd - FRAME); ctx.clip();
+      ctx.globalAlpha = 0.55;
+      cover(ctx, band, FRAME, FRAME, W - 2 * FRAME, topEnd - FRAME);
+      ctx.globalAlpha = 1;
+      const veil = ctx.createLinearGradient(0, FRAME, 0, topEnd);
+      veil.addColorStop(0, 'rgba(18,6,4,.55)'); veil.addColorStop(0.5, 'rgba(18,6,4,.62)'); veil.addColorStop(1, 'rgba(18,6,4,.78)');
+      ctx.fillStyle = veil; ctx.fillRect(FRAME, FRAME, W - 2 * FRAME, topEnd - FRAME);
+      ctx.restore();
+    }
+    drawing = true;
+    top();
+
+    // ---------- Profil ----------
+    if (r.profile) {
+      const varName = (r.profile.color.match(/var\((--[^)]+)\)/) || [])[1];
+      const pc = (varName && cssVar(varName)) || C.accent;
+      const y0 = y;
+      y += px(30);
+      ctx.save();
+      const yStart = y;
+      // mesure puis fond
+      ctx.fillText = () => {};
+      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + px(24) + 'px ' + SANS, { spacing: 6 });
+      space(14);
+      text([r.profile.name], 'italic 500 ' + px(62) + 'px ' + SERIF);
+      ctx.fillText = ctxFill;
+      const h = y - y0 + px(30);
+      ctx.restore();
+      ctx.fillStyle = pc; ctx.fillRect(FRAME, y0, W - 2 * FRAME, h);
+      y = yStart;
+      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + px(24) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)' });
+      space(14);
+      text([r.profile.name], 'italic 500 ' + px(62) + 'px ' + SERIF);
+      y = y0 + h;
+    }
+
+    // ---------- Sections ----------
+    const L = { x: M, align: 'left' };
+    const label = (t) => { text([t.toUpperCase()], '400 ' + px(24) + 'px ' + SANS, Object.assign({ spacing: 5, color: 'rgba(253,252,241,.6)' }, L)); space(18); };
+    const rule = () => { space(30); ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(W - M, y); ctx.stroke(); space(34); };
+    space(48);
+
+    // Je n'ai jamais
+    label('Je n’ai jamais');
+    {
+      const main = r.score === null ? '—' : r.score + ' « j’ai déjà »';
+      const fMain = '500 ' + px(46) + 'px ' + SERIF;
+      const { asc } = metrics(fMain);
+      ctx.font = fMain; ctx.fillStyle = C.cream; ctx.textAlign = 'left';
+      ctx.fillText(main, M, y + asc);
+      if (r.score !== null) {
+        const w0 = ctx.measureText(main + '  ').width;
+        ctx.font = '400 ' + px(26) + 'px ' + SANS; ctx.fillStyle = C.soft;
+        ctx.fillText('sur ' + r.of + (r.rank ? ' · ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : ''), M + w0, y + asc);
+      }
+      text(['X'], fMain, { color: 'transparent' }); // avance le curseur
+    }
+    rule();
+
+    // Mon analyse de pro
+    label('Mon analyse de pro' + (r.bottle1 ? ' · ' + r.bottle1 : ''));
+    {
+      const f = 'italic 500 ' + px(40) + 'px ' + SERIF;
+      ctx.font = f;
+      text(wrap(ctx, r.note1 ? '« ' + r.note1 + ' »' : '—', maxW, 3), f, Object.assign({ lead: 0.28 }, L));
+    }
+    rule();
+
+    // La différence (un seul rhum : la dernière question révélée)
+    label('La différence');
+    {
+      const d = r.paris.length ? r.paris[r.paris.length - 1] : null;
+      if (!d) text(['—'], '500 ' + px(40) + 'px ' + SERIF, L);
+      else {
+        const fName = '500 ' + px(40) + 'px ' + SERIF;
+        const pill = d.won === null ? '—' : d.won ? 'TROUVÉ' : 'RATÉ';
+        ctx.font = '600 ' + px(22) + 'px ' + SANS;
+        const pw = spacedWidth(ctx, pill, 4) + 40, ph = px(44);
+        ctx.font = fName;
+        const nameLines = wrap(ctx, d.bottle, maxW - pw - 30, 2);
+        const yName = y;
+        text(nameLines, fName, Object.assign({ lead: 0.25 }, L));
+        // pastille alignée sur la 1re ligne
+        const { asc, desc } = metrics(fName);
+        const cy = yName + (asc + desc) / 2;
+        roundRect(ctx, W - M - pw, cy - ph / 2, pw, ph, ph / 2);
+        if (d.won) { ctx.fillStyle = C.accent2; ctx.fill(); } else { ctx.strokeStyle = 'rgba(253,252,241,.4)'; ctx.lineWidth = 2; ctx.stroke(); }
+        ctx.font = '600 ' + px(22) + 'px ' + SANS; ctx.fillStyle = d.won ? C.bg : 'rgba(253,252,241,.7)';
+        const pm = ctx.measureText('T');
+        spaced(ctx, pill, W - M - pw / 2, cy + (pm.actualBoundingBoxAscent || px(16)) / 2, 4, 'center');
+        if (d.explanation) {
+          space(16);
+          const fE = 'italic 500 ' + px(32) + 'px ' + SERIF;
+          ctx.font = fE;
+          text(wrap(ctx, d.explanation, maxW, 3), fE, Object.assign({ color: 'rgba(253,252,241,.8)', lead: 0.3 }, L));
+        }
+      }
+    }
+    rule();
+
+    // Ma dégustation préférée
+    label('Ma dégustation préférée');
+    if (r.vote) {
+      const f = '500 ' + px(42) + 'px ' + SERIF;
+      ctx.font = f;
+      text(wrap(ctx, r.vote.label, maxW, 2), f, Object.assign({ lead: 0.25 }, L));
+      space(12);
+      text([r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête'], '400 ' + px(26) + 'px ' + SANS, Object.assign({ color: C.soft }, L));
+    } else text(['—'], '500 ' + px(42) + 'px ' + SERIF, L);
+    rule();
+
+    // Mon mot de la soirée
+    label('Mon mot de la soirée');
+    {
+      const f = 'italic 500 ' + px(42) + 'px ' + SERIF;
+      ctx.font = f;
+      text(wrap(ctx, r.closing ? '« ' + r.closing + ' »' : '—', maxW, 2), f, Object.assign({ lead: 0.28 }, L));
+    }
+    const bottom = y;
+
+    // ---------- Cadre + pied ----------
+    ctx.strokeStyle = 'rgba(237,184,103,.45)'; ctx.lineWidth = 2;
+    ctx.strokeRect(FRAME, FRAME, W - 2 * FRAME, H - 2 * FRAME);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = C.gold; ctx.font = '400 24px ' + SANS;
+    spaced(ctx, ('Martinique · ' + (s.event.date || '')).toUpperCase(), W / 2, H - 82, 7, 'center');
+
+    return { canvas: cv, bottom };
+  }
+
   async function makeFile(s, r) {
     const cv = await draw(s, r);
     const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
-    const safe = String(r.pseudo || 'fiche').normalize('NFD').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'fiche';
+    const safe = String(r.pseudo || 'fiche').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'fiche';
     return new File([blob], 'autour-dun-verre-' + safe + '.png', { type: 'image/png' });
   }
 

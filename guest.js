@@ -363,8 +363,9 @@
       const voteTxt = r.vote
         ? esc(r.vote.label) + ' <small>· ' + (r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête') + '</small>'
         : none;
+      // La différence porte sur un seul rhum : on affiche la dernière question révélée
       const diffs = r.paris.length
-        ? r.paris.map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.explanation ? esc(p.explanation) : 'bonne réponse : ' + esc(p.correctOption)) + '</small></span>' +
+        ? r.paris.slice(-1).map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.explanation ? esc(p.explanation) : 'bonne réponse : ' + esc(p.correctOption)) + '</small></span>' +
           (p.won === null ? '<span class="pill lost">—</span>' : '<span class="pill ' + (p.won ? 'won' : 'lost') + '">' + (p.won ? 'trouvé' : 'raté') + '</span>') + '</div>').join('')
         : none;
       const popKey = 'adv_recap_seen_' + s.sessionId + (slot ? '_' + slot : '');
