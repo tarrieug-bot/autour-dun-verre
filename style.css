@@ -256,7 +256,7 @@ select.input option { background: var(--bg-2); }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 22px -8px var(--accent); } 50% { box-shadow: 0 0 34px -4px var(--accent); } }
 .answer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
 .answer-row .btn { min-height: 96px; font-size: .74rem; flex-direction: column; letter-spacing: .14em; }
-.answer-row .btn .big { font-family: var(--serif); font-style: italic; font-size: 1.8rem; text-transform: none; font-weight: 400; letter-spacing: 0; }
+.answer-row .btn .big { font-family: var(--serif); font-style: italic; font-size: 1.45rem; line-height: 1.1; margin-bottom: 4px; text-transform: none; font-weight: 400; letter-spacing: 0; }
 .answer-row .btn.chosen, .options .btn.chosen { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--gold), 0 0 26px -4px var(--accent); }
 .answered { text-align: center; margin-top: 16px; font-size: .85rem; color: var(--encre-soft); letter-spacing: .05em; }
 .progress { height: 2px; background: rgba(253,252,241,.12); margin-top: 10px; border-radius: 2px; overflow: hidden; }

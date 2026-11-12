@@ -3,7 +3,7 @@
   const { esc, sprig, stamp, toast, store, applyTheme } = window.UI;
   const PW_KEY = 'adv_host_pw';
   const PHASE_LABELS = {
-    LOBBY: 'Accueil', BODY_COUNT: 'Body Count', CLASSEMENT: 'Classement', BOUTEILLE_1: 'Mot Interdit',
+    LOBBY: 'Accueil', BODY_COUNT: 'Je n’ai jamais', CLASSEMENT: 'Classement', BOUTEILLE_1: 'Mot Interdit',
     BOUTEILLE_2: 'Le Match', BOUTEILLE_3: 'Juste Prix', CLOTURE: 'Mur de mots', RECAP: 'Fiches récap',
   };
 
@@ -140,7 +140,7 @@
         '<div class="url">' + esc(url.replace(/^https?:\/\//, '')) + '</div></div>' +
         '<div class="card"><div class="label">Arrivés</div><div class="bigstat" id="n"></div>' +
         '<p class="muted" style="font-size:.85rem">Chaque invité présent au démarrage lira une affirmation, une seule fois.</p>' +
-        '<button class="btn block red" id="start">Démarrer le Body Count</button></div></div>' +
+        '<button class="btn block red" id="start">Lancer « Je n’ai jamais »</button></div></div>' +
         '<div class="card" id="prepSum"></div>';
       const q = (id) => root.querySelector('#' + id);
       q('start').onclick = () => act('startBody');
@@ -151,7 +151,7 @@
           const nb = h.config.bodyCount || Math.min(h.players.length, c.statementsCount) || 0;
           q('prepSum').innerHTML = '<div class="label gold">Préparation</div>' +
             '<p style="margin:8px 0 4px">' + esc(h.event.subtitle || '') + ' · ' + esc(h.event.date) + ' · thème ' + (h.event.theme === 'champagne' ? 'Champagne' : 'Whisky') + '</p>' +
-            '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' pari(s) préparé(s) · Body Count : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
+            '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' pari(s) préparé(s) · Je n’ai jamais : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
             '<div style="margin:-4px 0 12px;font-size:.82rem">' + cloudLine(h) + '</div>' +
             '<button class="btn small ghost" id="goPrep">Ouvrir la préparation</button>';
           q('goPrep').onclick = () => { prepMode = true; mountedKey = null; render(); };
@@ -165,7 +165,7 @@
         '<p class="statement" id="stmt"></p><div>Lecteur : <strong id="reader"></strong></div>' +
         '<div class="btn-row" style="margin-top:16px"><button class="btn ghost" id="prev">← Précédente</button><button class="btn" id="next">Affirmation suivante →</button></div>' +
         '<button class="btn block red" id="rank" style="margin-top:10px">Voir le classement</button></div>' +
-        '<div class="grid2"><div class="card"><div class="label">Ont répondu « Oui »</div><div id="yes"></div><div class="label" style="margin-top:12px">« Non »</div><div id="no"></div><div class="label" style="margin-top:12px">En attente</div><div id="wait"></div></div>' +
+        '<div class="grid2"><div class="card"><div class="label">« J’ai déjà »</div><div id="yes"></div><div class="label" style="margin-top:12px">« Je n’ai jamais »</div><div id="no"></div><div class="label" style="margin-top:12px">En attente</div><div id="wait"></div></div>' +
         '<div class="card"><div class="label">Ordre des lecteurs</div><ol id="readers" style="margin:8px 0 0;padding-left:20px;font-size:.88rem"></ol>' +
         '<button class="btn small ghost" id="reassign" style="margin-top:10px">Redistribuer les lecteurs</button></div></div>';
       const q = (id) => root.querySelector('#' + id);
@@ -193,7 +193,7 @@
 
     CLASSEMENT(root) {
       root.innerHTML =
-        '<div class="card"><div class="label gold">Classement du Body Count</div><table class="rank" id="tbl"></table>' +
+        '<div class="card"><div class="label gold">Classement · Je n’ai jamais</div><table class="rank" id="tbl"></table>' +
         '<div class="btn-row" style="margin-top:14px"><button class="btn ghost small" id="recalc">Recalculer les profils</button><button class="btn small" id="go">Passer à la Bouteille 1 →</button></div></div>' +
         '';
       const q = (id) => root.querySelector('#' + id);
@@ -203,7 +203,7 @@
         update(h) {
           const tc = (k) => h.profiles.find((t) => t.key === k) || { name: '—', color: 'transparent' };
           const rk = h.ranking || [];
-          q('tbl').innerHTML = '<tr><th class="label">#</th><th class="label">Invité</th><th class="label">Score</th><th class="label">Profil de dégustateur</th></tr>' +
+          q('tbl').innerHTML = '<tr><th class="label">#</th><th class="label">Invité</th><th class="label">« J’ai déjà »</th><th class="label">Profil de dégustateur</th></tr>' +
             rk.map((r) => '<tr><td>' + r.rank + '</td><td><strong>' + esc(r.pseudo) + '</strong> · <em class="serif">' + esc(r.word) + '</em></td><td>' + r.score + '</td>' +
               '<td><span class="profile-badge" style="background:' + tc(r.profile).color + '">' + esc(tc(r.profile).name) + '</span></td></tr>').join('');
         },
@@ -440,7 +440,7 @@
         '<p class="muted" style="font-size:.85rem;margin:6px 0 4px">Nom + photo (optionnelle). Elles servent ensuite dans les jeux ci-dessous.</p>' +
         '<div id="bottles"></div><button class="btn small ghost" id="addBottle" style="margin-top:12px">+ Ajouter une bouteille</button></div>' +
 
-        '<div class="card"><div class="label gold">3 · Body Count</div><div class="grid2">' +
+        '<div class="card"><div class="label gold">3 · Je n’ai jamais</div><div class="grid2">' +
         '<label class="field"><span class="label">Nombre d’affirmations</span><select class="input" id="bodyCount"><option value="0">Automatique · 1 par invité</option>' +
         Array.from({ length: 30 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '</option>').join('') + '</select></label>' +
         '<div class="muted" style="font-size:.82rem;align-self:center">Chaque invité ne lit qu’une fois. S’il y a plus d’affirmations que d’invités, les dernières sont lues par toi.</div></div>' +

@@ -131,16 +131,16 @@
       };
     },
 
-    /* ---------------- Body Count ---------------- */
+    /* ---------------- Je n'ai jamais ---------------- */
     BODY_COUNT(root) {
       root.innerHTML =
-        head('Brise-glace', 'Le Body Count') +
+        head('Brise-glace', 'Je n’ai <em>jamais</em>') +
         '<div class="card"><div class="counter" id="ctr"></div><div class="progress"><div id="prog"></div></div>' +
         '<p class="statement" id="stmt"></p><div class="muted" id="readby" style="font-size:.8rem"></div></div>' +
         '<div id="reader"></div>' +
         '<div class="answer-row">' +
-        '<button class="btn" id="yes"><span class="big">Oui</span>ça me ressemble</button>' +
-        '<button class="btn ghost" id="no"><span class="big">Non</span>pas moi</button></div>' +
+        '<button class="btn" id="yes"><span class="big">J’ai déjà</span>c’est vrai pour moi</button>' +
+        '<button class="btn ghost" id="no"><span class="big">Je n’ai jamais</span>jamais de la vie</button></div>' +
         '<div class="answered" id="answered"></div>';
       const $ = (id) => root.querySelector('#' + id);
       let idx = -1;
@@ -178,12 +178,12 @@
     /* ---------------- Classement ---------------- */
     CLASSEMENT(root, s) {
       const r = s.ranking;
-      if (!r) { root.innerHTML = head('Body Count', 'Classement') + '<p class="muted">Le classement arrive…</p>'; return; }
+      if (!r) { root.innerHTML = head('Je n’ai jamais', 'Classement') + '<p class="muted">Le classement arrive…</p>'; return; }
       const t = s.me.profile;
       root.innerHTML =
-        head('Body Count · résultats', 'Ton classement') +
+        head('Je n’ai jamais · résultats', 'Ton classement') +
         '<div class="card stats"><div><div class="label">Rang</div><div class="big-num">' + r.rank + '<sup style="font-size:1.4rem">' + (r.rank === 1 ? 'er' : 'e') + '</sup></div><div class="muted" style="font-size:.8rem">sur ' + r.total + '</div></div>' +
-        '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« oui » sur ' + (r.of || 10) + '</div></div></div>' +
+        '<div><div class="label">Score</div><div class="big-num">' + r.score + '</div><div class="muted" style="font-size:.8rem">« j’ai déjà » sur ' + (r.of || 10) + '</div></div></div>' +
         (t
           ? '<div class="card profile-card" style="background:' + t.color + '"><div class="label">Ton profil de dégustateur</div><h2>' + esc(t.name) + '</h2>' + sprig() + '</div>'
           : '');
@@ -371,7 +371,7 @@
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
-        sec('Body Count', r.score === null ? none : r.score + ' « oui » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
+        sec('Je n’ai jamais', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
         sec('Le Mot Interdit' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         sec('Le Match', voteTxt) +
         '<div class="recap-sec"><div class="label">Le Juste Prix</div><div style="margin-top:4px">' + paris + '</div></div>' +

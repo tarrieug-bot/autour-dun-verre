@@ -28,33 +28,87 @@ const io = new Server(server, { maxHttpBufferSize: 12e6, pingInterval: 20000, pi
 /* ------------------------------------------------------------------ */
 const PHASES = ['LOBBY', 'BODY_COUNT', 'CLASSEMENT', 'BOUTEILLE_1', 'BOUTEILLE_2', 'BOUTEILLE_3', 'CLOTURE', 'RECAP'];
 
+// Jeu « Je n'ai jamais » : réponse « J'ai déjà » = 1 point
 const DEFAULT_STATEMENTS = [
-  "Lève la main si tu as déjà acheté une bouteille juste parce que l'étiquette était belle.",
-  "Lève la main si tu as déjà confondu deux spiritueux au goût sans t'en rendre compte.",
-  "Lève la main si tu penses qu'un vin ou un rhum vieux est automatiquement meilleur qu'un jeune.",
-  "Lève la main si tu as une bouteille qui prend la poussière chez toi depuis plus d'un an.",
-  "Lève la main si tu as déjà fait, ou voulu faire, un rhum arrangé toi-même.",
-  "Lève la main si tu commandes presque toujours la même chose au bar.",
-  "Lève la main si tu as déjà offert une bouteille sans vraiment savoir ce qu'il y avait dedans.",
-  "Lève la main si tu crois que la couleur d'un spiritueux en dit long sur sa qualité.",
-  "Lève la main si tu as déjà fini un verre que tu n'aimais pas, juste pour ne pas gâcher.",
-  "Lève la main si tu es du genre à sentir une bouteille avant même de la goûter.",
-  "Lève la main si tu as déjà fait semblant de sentir des arômes que tu ne sentais pas du tout.",
-  "Lève la main si tu as déjà choisi un vin au restaurant uniquement d'après son prix.",
-  "Lève la main si tu penses qu'un glaçon gâche forcément un bon spiritueux.",
-  "Lève la main si tu gardes une bouteille « pour une grande occasion » qui n'est jamais arrivée.",
-  "Lève la main si tu as déjà goûté un spiritueux dont tu ne saurais même pas prononcer le nom.",
-  "Lève la main si tu as déjà ramené une bouteille de voyage qui n'avait plus le même goût à la maison.",
-  "Lève la main si tu sais faire la différence entre un rhum agricole et un rhum de mélasse.",
-  "Lève la main si tu as déjà dit « il est très rond en bouche » sans trop savoir ce que ça voulait dire.",
-  "Lève la main si tu as déjà mélangé un très bon spiritueux avec du soda.",
-  "Lève la main si tu as déjà visité une distillerie, une cave ou un domaine.",
-  "Lève la main si tu as un verre préféré pour déguster.",
-  "Lève la main si tu as déjà été la seule personne à table à aimer une bouteille.",
-  "Lève la main si tu as déjà noté un vin ou un spiritueux sur une appli.",
-  "Lève la main si tu penses que le champagne, c'est seulement pour les fêtes.",
-  "Lève la main si tu as déjà trinqué sans regarder les autres dans les yeux.",
+  "Je n'ai jamais acheté une bouteille juste parce que l'étiquette était belle.",
+  "Je n'ai jamais confondu deux spiritueux au goût sans m'en rendre compte.",
+  "Je n'ai jamais pensé qu'un rhum ou un vin vieux était forcément meilleur qu'un jeune.",
+  "Je n'ai jamais laissé une bouteille prendre la poussière chez moi pendant plus d'un an.",
+  "Je n'ai jamais fait, ni voulu faire, un rhum arrangé moi-même.",
+  "Je n'ai jamais commandé exactement la même chose au bar trois fois de suite.",
+  "Je n'ai jamais offert une bouteille sans vraiment savoir ce qu'il y avait dedans.",
+  "Je n'ai jamais jugé la qualité d'un spiritueux à sa couleur.",
+  "Je n'ai jamais fini un verre que je n'aimais pas, juste pour ne pas gâcher.",
+  "Je n'ai jamais senti une bouteille avant même de la goûter.",
+  "Je n'ai jamais fait semblant de sentir des arômes que je ne sentais pas du tout.",
+  "Je n'ai jamais choisi un vin au restaurant uniquement d'après son prix.",
+  "Je n'ai jamais grimacé en voyant quelqu'un mettre un glaçon dans un bon spiritueux.",
+  "Je n'ai jamais gardé une bouteille « pour une grande occasion » qui n'est jamais arrivée.",
+  "Je n'ai jamais goûté un spiritueux dont je ne saurais même pas prononcer le nom.",
+  "Je n'ai jamais ramené une bouteille de voyage qui n'avait plus le même goût à la maison.",
+  "Je n'ai jamais reconnu un rhum agricole les yeux fermés.",
+  "Je n'ai jamais dit « il est très rond en bouche » sans trop savoir ce que ça voulait dire.",
+  "Je n'ai jamais mélangé un très bon spiritueux avec du soda.",
+  "Je n'ai jamais visité de distillerie, de cave ou de domaine.",
+  "Je n'ai jamais eu de verre préféré pour déguster.",
+  "Je n'ai jamais été la seule personne à table à aimer une bouteille.",
+  "Je n'ai jamais noté un vin ou un spiritueux sur une appli.",
+  "Je n'ai jamais ouvert de champagne en dehors d'une fête.",
+  "Je n'ai jamais trinqué sans regarder les autres dans les yeux.",
 ];
+// Anciennes formulations (« Lève la main si tu … » / « Tu … ») → nouvelles, pour les préparations déjà enregistrées
+const LEGACY_STATEMENTS = new Map([
+  ["Tu as déjà acheté une bouteille juste parce que l'étiquette était belle.", 0],
+  ["Lève la main si tu as déjà acheté une bouteille juste parce que l'étiquette était belle.", 0],
+  ["Tu as déjà confondu deux spiritueux au goût sans t'en rendre compte.", 1],
+  ["Lève la main si tu as déjà confondu deux spiritueux au goût sans t'en rendre compte.", 1],
+  ["Tu penses qu'un vin ou un rhum vieux est automatiquement meilleur qu'un jeune.", 2],
+  ["Lève la main si tu penses qu'un vin ou un rhum vieux est automatiquement meilleur qu'un jeune.", 2],
+  ["Tu as une bouteille qui prend la poussière chez toi depuis plus d'un an.", 3],
+  ["Lève la main si tu as une bouteille qui prend la poussière chez toi depuis plus d'un an.", 3],
+  ["Tu as déjà fait, ou voulu faire, un rhum arrangé toi-même.", 4],
+  ["Lève la main si tu as déjà fait, ou voulu faire, un rhum arrangé toi-même.", 4],
+  ["Tu commandes presque toujours la même chose au bar.", 5],
+  ["Lève la main si tu commandes presque toujours la même chose au bar.", 5],
+  ["Tu as déjà offert une bouteille sans vraiment savoir ce qu'il y avait dedans.", 6],
+  ["Lève la main si tu as déjà offert une bouteille sans vraiment savoir ce qu'il y avait dedans.", 6],
+  ["Tu crois que la couleur d'un spiritueux en dit long sur sa qualité.", 7],
+  ["Lève la main si tu crois que la couleur d'un spiritueux en dit long sur sa qualité.", 7],
+  ["Tu as déjà fini un verre que tu n'aimais pas, juste pour ne pas gâcher.", 8],
+  ["Lève la main si tu as déjà fini un verre que tu n'aimais pas, juste pour ne pas gâcher.", 8],
+  ["Tu es du genre à sentir une bouteille avant même de la goûter.", 9],
+  ["Lève la main si tu es du genre à sentir une bouteille avant même de la goûter.", 9],
+  ["Tu as déjà fait semblant de sentir des arômes que tu ne sentais pas du tout.", 10],
+  ["Lève la main si tu as déjà fait semblant de sentir des arômes que tu ne sentais pas du tout.", 10],
+  ["Tu as déjà choisi un vin au restaurant uniquement d'après son prix.", 11],
+  ["Lève la main si tu as déjà choisi un vin au restaurant uniquement d'après son prix.", 11],
+  ["Tu penses qu'un glaçon gâche forcément un bon spiritueux.", 12],
+  ["Lève la main si tu penses qu'un glaçon gâche forcément un bon spiritueux.", 12],
+  ["Tu gardes une bouteille « pour une grande occasion » qui n'est jamais arrivée.", 13],
+  ["Lève la main si tu gardes une bouteille « pour une grande occasion » qui n'est jamais arrivée.", 13],
+  ["Tu as déjà goûté un spiritueux dont tu ne saurais même pas prononcer le nom.", 14],
+  ["Lève la main si tu as déjà goûté un spiritueux dont tu ne saurais même pas prononcer le nom.", 14],
+  ["Tu as déjà ramené une bouteille de voyage qui n'avait plus le même goût à la maison.", 15],
+  ["Lève la main si tu as déjà ramené une bouteille de voyage qui n'avait plus le même goût à la maison.", 15],
+  ["Tu sais faire la différence entre un rhum agricole et un rhum de mélasse.", 16],
+  ["Lève la main si tu sais faire la différence entre un rhum agricole et un rhum de mélasse.", 16],
+  ["Tu as déjà dit « il est très rond en bouche » sans trop savoir ce que ça voulait dire.", 17],
+  ["Lève la main si tu as déjà dit « il est très rond en bouche » sans trop savoir ce que ça voulait dire.", 17],
+  ["Tu as déjà mélangé un très bon spiritueux avec du soda.", 18],
+  ["Lève la main si tu as déjà mélangé un très bon spiritueux avec du soda.", 18],
+  ["Tu as déjà visité une distillerie, une cave ou un domaine.", 19],
+  ["Lève la main si tu as déjà visité une distillerie, une cave ou un domaine.", 19],
+  ["Tu as un verre préféré pour déguster.", 20],
+  ["Lève la main si tu as un verre préféré pour déguster.", 20],
+  ["Tu as déjà été la seule personne à table à aimer une bouteille.", 21],
+  ["Lève la main si tu as déjà été la seule personne à table à aimer une bouteille.", 21],
+  ["Tu as déjà noté un vin ou un spiritueux sur une appli.", 22],
+  ["Lève la main si tu as déjà noté un vin ou un spiritueux sur une appli.", 22],
+  ["Tu penses que le champagne, c'est seulement pour les fêtes.", 23],
+  ["Lève la main si tu penses que le champagne, c'est seulement pour les fêtes.", 23],
+  ["Tu as déjà trinqué sans regarder les autres dans les yeux.", 24],
+  ["Lève la main si tu as déjà trinqué sans regarder les autres dans les yeux.", 24],
+]);
 
 // Profils de dégustateur : résultat personnel du Body Count (tiers du classement)
 const PROFILES = [
@@ -220,6 +274,12 @@ function cloudSave() {
 const DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/;
 const shortId = (s) => String(s || '').replace(/[^\w-]/g, '').slice(0, 40);
 
+/* Migration : les anciennes affirmations par défaut sont remplacées par leur version « Je n'ai jamais ». */
+function phoneWording(t) {
+  const k = String(t || '').trim();
+  return LEGACY_STATEMENTS.has(k) ? DEFAULT_STATEMENTS[LEGACY_STATEMENTS.get(k)] : k;
+}
+
 function sanitizeConfig(c, keepTime) {
   const d = defaultConfig();
   if (!c || typeof c !== 'object') return d;
@@ -250,7 +310,7 @@ function sanitizeConfig(c, keepTime) {
     out.bottles.push({ id, name: clean(b.name, 60) || 'Bouteille', image: img, rev: crypto.createHash('md5').update(img || '').digest('hex').slice(0, 8) });
   });
   const has = (id) => out.bottles.some((b) => b.id === id);
-  const st = (Array.isArray(c.statements) ? c.statements : []).map((x) => clean(x, 240)).filter(Boolean).slice(0, 60);
+  const st = (Array.isArray(c.statements) ? c.statements : []).map((x) => phoneWording(clean(x, 240))).filter(Boolean).slice(0, 60);
   out.statements = st.length ? st : d.statements;
   if (c.b1) {
     out.b1.bottleId = has(c.b1.bottleId) ? c.b1.bottleId : null;
@@ -848,7 +908,7 @@ function hostAction(a) {
       startBody();
       return;
     case 'saveStatements': {
-      const st = (Array.isArray(a.statements) ? a.statements : []).map((x) => clean(x, 240)).filter(Boolean).slice(0, 60);
+      const st = (Array.isArray(a.statements) ? a.statements : []).map((x) => phoneWording(clean(x, 240))).filter(Boolean).slice(0, 60);
       if (st.length) state.config.statements = st;
       state.config.bodyCount = Math.max(0, Math.min(60, parseInt(a.bodyCount, 10) || 0));
       touchConfig();
