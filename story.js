@@ -239,23 +239,6 @@
     const rule = () => { space(26); ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(W - M, y); ctx.stroke(); space(30); };
     space(48);
 
-    // Je n'ai jamais
-    label('Je n’ai jamais');
-    {
-      const main = r.score === null ? '—' : r.score + ' « j’ai déjà »';
-      const fMain = '500 ' + px(46) + 'px ' + SERIF;
-      const { asc } = metrics(fMain);
-      ctx.font = fMain; ctx.fillStyle = C.cream; ctx.textAlign = 'left';
-      ctx.fillText(main, M, y + asc);
-      if (r.score !== null) {
-        const w0 = ctx.measureText(main + '  ').width;
-        ctx.font = '400 ' + px(28, 25) + 'px ' + SANS; ctx.fillStyle = C.soft;
-        ctx.fillText('sur ' + r.of + (r.rank ? ' · ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : ''), M + w0, y + asc);
-      }
-      text(['X'], fMain, { color: 'transparent' }); // avance le curseur
-    }
-    rule();
-
     // Mon analyse de pro
     label('Mon analyse de pro' + (r.bottle1 ? ' · ' + r.bottle1 : ''));
     {
@@ -327,25 +310,150 @@
     return { canvas: cv, bottom };
   }
 
-  async function makeFile(s, r) {
-    const cv = await draw(s, r);
-    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+  /* ---------- Fiche 2 : les bouteilles de la soirée ---------- */
+  async function drawBottles(s, r) {
+    await document.fonts.load('italic 500 60px "Bodoni Moda"').catch(() => {});
+    const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
+    const bottles = (r.bottles || []).slice(0, 4);
+    const [band, logo, ...photos] = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png'), ...bottles.map((b) => (b.image ? loadImg(b.image) : Promise.resolve(null)))]);
+    const C = {
+      bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
+      accent2: cssVar('--accent-2') || '#F59A45', gold: cssVar('--gold') || '#EDB867', cream: '#FDFCF1', soft: 'rgba(253,252,241,.66)',
+    };
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const maxW = W - 2 * M;
+    const asc = (font, t) => { ctx.font = font; return ctx.measureText(t || 'ÉHg').actualBoundingBoxAscent; };
+
+    // Fond : verre sur toute la page, très atténué
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    if (band) {
+      ctx.save(); ctx.globalAlpha = 0.5; cover(ctx, band, FRAME, FRAME, W - 2 * FRAME, 700); ctx.restore();
+      const v = ctx.createLinearGradient(0, FRAME, 0, FRAME + 700);
+      v.addColorStop(0, 'rgba(18,6,4,.55)'); v.addColorStop(0.6, 'rgba(18,6,4,.72)'); v.addColorStop(1, C.bg);
+      ctx.fillStyle = v; ctx.fillRect(FRAME, FRAME, W - 2 * FRAME, 700);
+    }
+    ctx.textAlign = 'center';
+    let y = FRAME + 90;
+    if (s.event.orga) {
+      ctx.fillStyle = C.cream; ctx.font = '400 30px ' + SANS;
+      let fs = 30; while (spacedWidth(ctx, s.event.orga.toUpperCase(), 6) > maxW && fs > 18) { fs--; ctx.font = '400 ' + fs + 'px ' + SANS; }
+      spaced(ctx, s.event.orga.toUpperCase(), W / 2, y, 6, 'center');
+      y += 30 + asc('italic 500 46px ' + SERIF, 'vous');
+      ctx.fillText('vous font Vivre', W / 2, y);
+      y += 50;
+    }
+    if (logo) {
+      const lw = 560, lh = (logo.height / logo.width) * lw;
+      ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 26;
+      ctx.drawImage(logo, (W - lw) / 2, y, lw, lh); ctx.shadowBlur = 0;
+      y += lh + 40;
+    }
+    if (s.event.subtitle) {
+      const sub = s.event.subtitle.toUpperCase();
+      let fs = 32, sp = 7; ctx.font = '600 ' + fs + 'px ' + SANS;
+      while (spacedWidth(ctx, sub, sp) > maxW && fs > 18) { fs--; sp = Math.max(3, sp - 0.3); ctx.font = '600 ' + fs + 'px ' + SANS; }
+      y += asc(ctx.font, sub);
+      ctx.fillStyle = C.accent2; ctx.shadowColor = C.accent; ctx.shadowBlur = 22;
+      spaced(ctx, sub, W / 2, y, sp, 'center'); ctx.shadowBlur = 0;
+      y += 70;
+    }
+
+    // Titre
+    ctx.fillStyle = C.cream; ctx.font = 'italic 500 70px ' + SERIF;
+    y += asc(ctx.font, 'Les');
+    ctx.fillText('Les bouteilles', W / 2, y);
+    y += 22 + asc(ctx.font, 'de');
+    ctx.fillText('de la soirée', W / 2, y);
+    y += 34;
+    ctx.strokeStyle = 'rgba(237,184,103,.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(W / 2 - 40, y); ctx.lineTo(W / 2 + 40, y); ctx.stroke();
+    y += 60;
+
+    // Les bouteilles côte à côte
+    const n = Math.max(1, bottles.length);
+    const gap = 30;
+    const cw = Math.floor((maxW - gap * (n - 1)) / n);
+    const nameFont = 'italic 500 ' + (n >= 4 ? 32 : 38) + 'px ' + SERIF;
+    // hauteur des noms (3 lignes max) puis cartes aussi hautes que possible, bloc centré verticalement
+    ctx.font = nameFont;
+    const nameA = asc(nameFont, 'É');
+    const maxLines = Math.max(1, ...bottles.map((b) => wrap(ctx, b.name, cw - 6, 3).length));
+    const namesH = 46 + nameA + (maxLines - 1) * nameA * 1.35 + 20;
+    const avail = (H - 300) - y;
+    const ch = Math.max(360, Math.min(Math.round(cw * 2.4), avail - namesH));
+    y += Math.max(0, Math.round((avail - ch - namesH) / 2));
+    bottles.forEach((b, i) => {
+      const x = M + i * (cw + gap);
+      // carte claire pour les photos sur fond blanc
+      roundRect(ctx, x, y, cw, ch, 10);
+      ctx.fillStyle = '#FBF8F1'; ctx.fill();
+      ctx.strokeStyle = 'rgba(237,184,103,.6)'; ctx.lineWidth = 2; ctx.stroke();
+      const img = photos[i];
+      if (img) {
+        const pad = 16;
+        const sc = Math.min((cw - 2 * pad) / img.width, (ch - 2 * pad) / img.height);
+        const iw = img.width * sc, ih = img.height * sc;
+        ctx.save(); roundRect(ctx, x + 2, y + 2, cw - 4, ch - 4, 8); ctx.clip();
+        ctx.drawImage(img, x + (cw - iw) / 2, y + (ch - ih) / 2, iw, ih);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(18,6,4,.5)'; ctx.font = 'italic 500 90px ' + SERIF;
+        ctx.fillText(String(i + 1), x + cw / 2, y + ch / 2 + 30);
+      }
+      // numéro d'ordre de dégustation
+      ctx.font = '600 22px ' + SANS;
+      const tag = 'N° ' + (i + 1);
+      const tw = spacedWidth(ctx, tag, 3) + 26;
+      roundRect(ctx, x + cw / 2 - tw / 2, y + ch - 18, tw, 36, 18);
+      ctx.fillStyle = C.accent2; ctx.fill();
+      ctx.fillStyle = C.bg; spaced(ctx, tag, x + cw / 2, y + ch + 8, 3, 'center');
+      // nom
+      ctx.fillStyle = C.cream; ctx.font = nameFont;
+      const lines = wrap(ctx, b.name, cw - 6, 3);
+      const a = asc(nameFont, 'É'), lh = a * 1.35;
+      lines.forEach((l, k) => ctx.fillText(l, x + cw / 2, y + ch + 46 + a + k * lh));
+    });
+    if (!bottles.length) { ctx.fillStyle = C.soft; ctx.font = 'italic 500 40px ' + SERIF; ctx.fillText('—', W / 2, y + 60); }
+
+    // Signature personnelle
+    const yb = H - 210;
+    ctx.fillStyle = C.soft; ctx.font = '400 26px ' + SANS;
+    spaced(ctx, 'DÉGUSTÉES PAR', W / 2, yb, 6, 'center');
+    ctx.fillStyle = C.cream; ctx.font = 'italic 500 56px ' + SERIF;
+    ctx.fillText(r.pseudo, W / 2, yb + 16 + asc(ctx.font, r.pseudo));
+
+    ctx.strokeStyle = 'rgba(237,184,103,.45)'; ctx.lineWidth = 2;
+    ctx.strokeRect(FRAME, FRAME, W - 2 * FRAME, H - 2 * FRAME);
+    ctx.fillStyle = C.gold; ctx.font = '400 24px ' + SANS;
+    spaced(ctx, ('Martinique · ' + (s.event.date || '')).toUpperCase(), W / 2, H - 82, 7, 'center');
+    return cv;
+  }
+
+  const toFile = async (cv, name) => new File([await new Promise((res) => cv.toBlob(res, 'image/png'))], name, { type: 'image/png' });
+  async function makeFiles(s, r) {
     const safe = String(r.pseudo || 'fiche').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'fiche';
-    return new File([blob], 'autour-dun-verre-' + safe + '.png', { type: 'image/png' });
+    const [c1, c2] = await Promise.all([draw(s, r), drawBottles(s, r)]);
+    return [await toFile(c1, 'autour-dun-verre-' + safe + '-1-ma-fiche.png'), await toFile(c2, 'autour-dun-verre-' + safe + '-2-les-bouteilles.png')];
   }
 
   /* Partage (menu natif du téléphone) ou téléchargement classique */
-  async function deliver(file) {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'Ma fiche · Autour d’un Verre' }); return 'shared'; } catch (e) { if (e && e.name === 'AbortError') return 'aborted'; }
+  async function deliver(files) {
+    files = [].concat(files);
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files, title: 'Mes fiches · Autour d’un Verre' }); return 'shared'; } catch (e) { if (e && e.name === 'AbortError') return 'aborted'; }
     }
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url; a.download = file.name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    for (const file of files) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      await new Promise((res) => setTimeout(res, 400));
+    }
     return 'downloaded';
   }
 
-  window.Story = { draw, makeFile, deliver };
+  window.Story = { draw, drawBottles, makeFiles, deliver };
 })();

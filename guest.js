@@ -375,40 +375,42 @@
         ov.innerHTML = '<div class="thanks-card" role="dialog" aria-modal="true">' +
           '<img src="/logo.png" alt="" class="thanks-logo">' +
           '<h2>Merci <em>' + esc(r.pseudo) + '</em> !</h2>' +
-          '<p>Merci d’avoir participé à cette soirée.<br>Ta fiche‑souvenir t’attend juste derrière.</p>' +
-          '<p class="muted" style="font-size:.88rem">Ferme cette fenêtre pour la découvrir, puis télécharge‑la au format story pour la garder et la partager.</p>' +
+          '<p>Merci d’avoir participé à cette soirée.<br>Tes fiches‑souvenirs t’attendent juste derrière.</p>' +
+          '<p class="muted" style="font-size:.88rem">Ferme cette fenêtre pour les découvrir, puis télécharge‑les au format story pour les garder et les partager.</p>' +
           '<button class="btn block" id="thanksClose">Découvrir ma fiche</button></div>';
         document.body.appendChild(ov);
         ov.querySelector('#thanksClose').onclick = () => { store.set(popKey, '1'); const tt = document.querySelector('.toast'); if (tt) tt.classList.remove('show'); ov.classList.add('out'); setTimeout(() => ov.remove(), 300); window.scrollTo(0, 0); };
       }
       root.innerHTML =
         '<div class="dl-zone"><button class="btn block" id="dlStory" disabled>Préparation de ta fiche…</button>' +
-        '<p class="center muted dl-hint">Télécharge ta fiche‑souvenir au format story pour la garder et la partager sur Instagram.</p></div>' +
+        '<p class="center muted dl-hint">Tes 2 fiches‑souvenirs au format story : ta soirée et les bouteilles dégustées. À garder et partager sur Instagram.</p></div>' +
         '<article class="recap">' +
         '<div class="recap-head">' + (s.event.orga ? '<div class="orga-top small"><span>' + esc(s.event.orga) + '</span><em>vous font Vivre</em></div>' : '') + '<div class="band"></div><img class="logo" src="/logo.png" alt="">' +
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
-        sec('Je n’ai jamais', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
         sec('Mon analyse de pro' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
         '<div class="recap-sec"><div class="label">La différence</div><div style="margin-top:4px">' + diffs + '</div></div>' +
         sec('Ma dégustation préférée', voteTxt) +
         sec('Mon mot de la soirée', r.closing ? '« ' + esc(r.closing) + ' »' : none) +
         '<div class="recap-foot">' + sprig() + '<span class="label">' + (s.event.place ? esc(s.event.place.split('·')[0].trim()) + '<br>' : '') + 'Martinique</span></div>' +
-        '</article>';
+        '</article>' +
+        '<article class="recap recap-bottles"><div class="label gold center">Les bouteilles de la soirée</div><div class="rb-grid">' +
+        (r.bottles || []).map((b, i) => '<div class="rb-item"><div class="rb-img">' + (b.image ? '<img src="' + esc(b.image) + '" alt="">' : '<span>' + (i + 1) + '</span>') + '<em>N° ' + (i + 1) + '</em></div><div class="rb-name">' + esc(b.name) + '</div></div>').join('') +
+        '</div></article>';
       // Image story préparée à l’avance : le bouton partage immédiatement (exigence des téléphones)
       const btn = root.querySelector('#dlStory');
       let file = null;
-      const label = (navigator.canShare ? 'Télécharger / partager ma fiche' : 'Télécharger ma fiche');
+      const label = (navigator.canShare ? 'Télécharger / partager mes 2 fiches' : 'Télécharger mes 2 fiches');
       if (window.Story) {
-        window.Story.makeFile(s, r).then((f) => { file = f; btn.disabled = false; btn.textContent = label; })
+        window.Story.makeFiles(s, r).then((f) => { file = f; btn.disabled = false; btn.textContent = label; })
           .catch(() => { btn.textContent = 'Fiche indisponible'; });
       } else btn.textContent = 'Fiche indisponible';
       btn.onclick = async () => {
         if (!file) return;
         const res = await window.Story.deliver(file);
-        if (res === 'downloaded') toast('Fiche téléchargée ✓');
+        if (res === 'downloaded') toast('Fiches téléchargées ✓');
       };
     },
   };

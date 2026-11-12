@@ -575,6 +575,7 @@ function recapFor(p) {
     total: state.ranking ? state.ranking.length : null,
     note1: p.note1 ? p.note1.text : null,
     bottle1: b1Bottle() ? b1Bottle().name : '',
+    bottles: state.config.bottles.map(bottlePublic), // 2e fiche : les bouteilles de la soirée
     vote,
     paris,
     closing: p.closing ? p.closing.text : null,
