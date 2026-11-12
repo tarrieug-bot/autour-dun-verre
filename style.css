@@ -406,3 +406,39 @@ select.input option { background: var(--bg-2); }
   .options { grid-template-columns: 1fr; }
   .options .btn { min-height: 64px; }
 }
+
+/* ---------- Perfect Match ---------- */
+.pm-list { display: grid; gap: 12px; }
+.pm-choice {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--glass); color: var(--cream); cursor: pointer; font: inherit;
+  transition: border-color .2s, box-shadow .2s, transform .08s; -webkit-tap-highlight-color: transparent;
+}
+.pm-choice:active { transform: scale(.99); }
+.pm-choice:disabled { cursor: default; opacity: .85; }
+.pm-choice img { width: 64px; height: 96px; object-fit: contain; flex: none; border-radius: 2px; background: rgba(255,255,255,.92); }
+.pm-noimg { width: 64px; height: 96px; flex: none; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 2rem; border: 1px solid var(--line); }
+.pm-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.pm-name { font-family: var(--serif); font-style: italic; font-size: 1.3rem; line-height: 1.15; }
+.pm-bar { height: 4px; background: rgba(253,252,241,.12); border-radius: 2px; overflow: hidden; }
+.pm-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s ease; }
+.pm-pct { font-family: var(--serif); font-size: 1.4rem; min-width: 3ch; text-align: right; }
+.pm-choice.chosen { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2), 0 0 26px -6px var(--accent); background: linear-gradient(135deg, rgba(232,89,42,.22), rgba(245,154,69,.08)); }
+
+/* ---------- Pop-up de remerciement ---------- */
+.thanks-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px;
+  background: rgba(8, 3, 2, .82); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: fadein .3s ease;
+}
+.thanks-overlay.out { opacity: 0; transition: opacity .3s; }
+.thanks-card {
+  max-width: 400px; width: 100%; text-align: center; padding: 26px 22px 22px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg)); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 20px 60px -20px #000, 0 0 40px -18px var(--accent);
+}
+.thanks-logo { width: 62%; margin: 0 auto 10px; display: block; }
+.thanks-card h2 { font-size: 2rem; margin: 6px 0 12px; }
+.thanks-card p { margin: 0 0 12px; line-height: 1.5; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }

@@ -61,6 +61,7 @@
     if (key !== mountedKey) {
       mountedKey = key;
       document.body.classList.toggle('has-hero', key === 'JOIN' || key === 'LOBBY');
+      if (key !== 'RECAP') document.querySelectorAll('.thanks-overlay').forEach((o) => o.remove());
       const t = document.querySelector('.toast');
       if (t) t.classList.remove('show');
       const factory = key === 'JOIN' ? Screens.JOIN : Screens[S.phase];
@@ -235,52 +236,52 @@
       };
     },
 
-    /* ---------------- Bouteille 2 : Le Match ---------------- */
+    /* ---------------- Perfect Match (dernier jeu) ---------------- */
     BOUTEILLE_2(root) {
       root.innerHTML =
-        head('Bouteille n°2', 'Le Match', 'Laquelle préfères-tu ? Tu peux changer d’avis jusqu’au verrouillage.') +
-        '<div class="match"><button class="btn ghost" id="a"></button><button class="btn ghost side-b" id="b"></button></div>' +
-        '<div class="split" id="split"><div class="a" id="pa"></div><div class="b" id="pb"></div></div>' +
+        head('Dernier jeu', 'Perfect <em>Match</em>', 'Quelle bouteille as-tu préférée ce soir ? Tu peux changer d’avis jusqu’au verrouillage.') +
+        '<div class="pm-list" id="list"></div>' +
         '<p class="center muted" id="status" style="margin-top:14px"></p>';
       const $ = (id) => root.querySelector('#' + id);
-      const vote = (side) => send('guest:vote2', { side });
-      $('a').onclick = () => vote(0);
-      $('b').onclick = () => vote(1);
+      let built = '';
       return {
         update(s) {
           const b = s.b2;
-          const im = (i) => (b.images && b.images[i] ? '<img src="' + esc(b.images[i]) + '" alt="" class="match-img">' : '');
-          const ha = im(0) + '<span class="label" style="color:inherit">côté A</span><span class="big">' + esc(b.labels[0]) + '</span>';
-          const hb = im(1) + '<span class="label" style="color:inherit">côté B</span><span class="big">' + esc(b.labels[1]) + '</span>';
-          if ($('a').dataset.h !== ha) { $('a').dataset.h = ha; $('a').innerHTML = ha; }
-          if ($('b').dataset.h !== hb) { $('b').dataset.h = hb; $('b').innerHTML = hb; }
-          $('a').classList.toggle('ghost', b.myVote !== 0);
-          $('b').classList.toggle('ghost', b.myVote !== 1);
-          $('a').disabled = $('b').disabled = b.locked;
-          if (b.pct) {
-            $('split').classList.remove('hidden');
-            $('pa').style.flexBasis = b.pct[0] + '%';
-            $('pb').style.flexBasis = b.pct[1] + '%';
-            $('pa').textContent = b.pct[0] >= 12 ? b.pct[0] + '%' : '';
-            $('pb').textContent = b.pct[1] >= 12 ? b.pct[1] + '%' : '';
-          } else $('split').classList.add('hidden');
+          const key = b.choices.map((c) => c.id + (c.image || '') + c.label).join('|');
+          if (key !== built) {
+            built = key;
+            $('list').innerHTML = b.choices.map((c, i) =>
+              '<button class="pm-choice" data-id="' + esc(c.id) + '">' +
+              (c.image ? '<img src="' + esc(c.image) + '" alt="">' : '<span class="pm-noimg">' + (i + 1) + '</span>') +
+              '<span class="pm-body"><span class="pm-name">' + esc(c.label) + '</span>' +
+              '<span class="pm-bar"><span class="pm-fill"></span></span></span>' +
+              '<span class="pm-pct"></span></button>').join('');
+            $('list').querySelectorAll('.pm-choice').forEach((el) => { el.onclick = () => send('guest:vote2', { choice: el.dataset.id }); });
+          }
+          $('list').querySelectorAll('.pm-choice').forEach((el, i) => {
+            el.classList.toggle('chosen', b.myVote === el.dataset.id);
+            el.disabled = b.locked;
+            const pct = b.pct ? b.pct[i] : 0;
+            el.querySelector('.pm-fill').style.width = pct + '%';
+            el.querySelector('.pm-pct').textContent = b.pct ? pct + '%' : '';
+          });
           $('status').textContent = b.locked
             ? 'Votes verrouillés.' + (b.myVote === null ? ' Tu n’as pas voté.' : '')
-            : b.myVote === null ? 'Touche une bouteille pour voter.' : 'Vote enregistré — tu peux encore changer.';
+            : b.myVote === null ? 'Touche ta bouteille préférée.' : 'Vote enregistré — tu peux encore changer.';
         },
       };
     },
 
-    /* ---------------- Bouteille 3 : Le Pari ---------------- */
+    /* ---------------- La différence (QCM) ---------------- */
     BOUTEILLE_3(root, s) {
       const r = s.b3;
       if (!r) {
-        root.innerHTML = head('Le Pari Final', 'Le Juste Prix') +
+        root.innerHTML = head('Bouteille suivante', 'La <em>différence</em>') +
           '<div class="stamp-wrap">' + stamp(s.event.date, 'patience') + '</div><div class="waiting">L’animateur prépare la bouteille<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>';
         return;
       }
       root.innerHTML =
-        head('Le Pari · n°' + r.number, 'Le Juste Prix') +
+        head('La différence · n°' + r.number, 'La <em>différence</em>') +
         '<div class="card center">' +
         (r.image ? '<div class="bottle-visual"><img src="' + esc(r.image) + '" alt=""></div>' : '') +
         (r.bottle ? '<h3>' + esc(r.bottle) + '</h3>' : '') +
@@ -308,10 +309,10 @@
             $('status').textContent = r.locked ? 'Réponses verrouillées — suspense…' : r.myAnswer === null ? 'Un seul choix, modifiable jusqu’au verrouillage.' : 'Choix enregistré.';
           } else {
             const verdict = r.won === null
-              ? '<div class="verdict"><div class="big" style="color:var(--encre-soft)">Pas de pari</div></div>'
+              ? '<div class="verdict"><div class="big" style="color:var(--encre-soft)">Pas de réponse</div></div>'
               : r.won
-                ? '<div class="verdict won"><div class="big">Gagné !</div><span class="label">bien vu</span></div>'
-                : '<div class="verdict lost"><div class="big">Perdu…</div><span class="label">ce sera pour la prochaine</span></div>';
+                ? '<div class="verdict won"><div class="big">Bien vu !</div><span class="label">palais affûté</span></div>'
+                : '<div class="verdict lost"><div class="big">Raté…</div><span class="label">ce sera pour la prochaine</span></div>';
             $('zone').innerHTML = verdict + '<div class="bars">' + r.options.map((o, i) =>
               '<div class="bar' + (i === r.correct ? ' correct' : '') + '"><div class="fill" style="width:' + r.pct[i] + '%"></div>' +
               '<div class="row"><span>' + esc(o) + (r.myAnswer === i ? ' <span class="muted">(toi)</span>' : '') + '</span>' +
@@ -357,12 +358,25 @@
       const sec = (label, val) => '<div class="recap-sec"><div class="label">' + label + '</div><div class="val">' + val + '</div></div>';
       const none = '<small>—</small>';
       const voteTxt = r.vote
-        ? esc(r.vote.label) + ' <small>· ' + (r.vote.side === 'majorite' ? 'dans la majorité' : r.vote.side === 'minorite' ? 'dans la minorité' : 'à égalité parfaite') + '</small>'
+        ? esc(r.vote.label) + ' <small>· ' + (r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête') + '</small>'
         : none;
-      const paris = r.paris.length
-        ? r.paris.map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.myOption ? 'ton choix : ' + esc(p.myOption) : 'pas de réponse') + '</small></span>' +
-          (p.won === null ? '<span class="pill lost">—</span>' : '<span class="pill ' + (p.won ? 'won' : 'lost') + '">' + (p.won ? 'gagné' : 'perdu') + '</span>') + '</div>').join('')
+      const diffs = r.paris.length
+        ? r.paris.map((p) => '<div class="pari-line"><span>' + esc(p.bottle) + '<br><small>' + (p.myOption ? 'ma réponse : ' + esc(p.myOption) : 'pas de réponse') + '</small></span>' +
+          (p.won === null ? '<span class="pill lost">—</span>' : '<span class="pill ' + (p.won ? 'won' : 'lost') + '">' + (p.won ? 'trouvé' : 'raté') + '</span>') + '</div>').join('')
         : none;
+      const popKey = 'adv_recap_seen_' + s.sessionId + (slot ? '_' + slot : '');
+      if (!store.get(popKey)) {
+        const ov = document.createElement('div');
+        ov.className = 'thanks-overlay';
+        ov.innerHTML = '<div class="thanks-card" role="dialog" aria-modal="true">' +
+          '<img src="/logo.png" alt="" class="thanks-logo">' +
+          '<h2>Merci <em>' + esc(r.pseudo) + '</em> !</h2>' +
+          '<p>Merci d’avoir participé à cette soirée. Ta fiche-souvenir t’attend juste derrière.</p>' +
+          '<p class="muted" style="font-size:.88rem">Ferme cette fenêtre pour la découvrir, puis fais une capture d’écran pour la garder en souvenir.</p>' +
+          '<button class="btn block" id="thanksClose">Découvrir ma fiche</button></div>';
+        document.body.appendChild(ov);
+        ov.querySelector('#thanksClose').onclick = () => { store.set(popKey, '1'); const tt = document.querySelector('.toast'); if (tt) tt.classList.remove('show'); ov.classList.add('out'); setTimeout(() => ov.remove(), 300); window.scrollTo(0, 0); };
+      }
       root.innerHTML =
         '<p class="center label" style="margin-bottom:10px">Ta fiche-souvenir · fais une capture d’écran</p>' +
         '<article class="recap">' +
@@ -371,10 +385,10 @@
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
         (t ? '<div class="recap-profile" style="background:' + t.color + '"><span class="label">Profil de dégustateur</span><span>' + esc(t.name) + '</span></div>' : '') +
-        sec('Je n’ai jamais', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
-        sec('Le Mot Interdit' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
-        sec('Le Match', voteTxt) +
-        '<div class="recap-sec"><div class="label">Le Juste Prix</div><div style="margin-top:4px">' + paris + '</div></div>' +
+        sec('Mon profil', r.score === null ? none : r.score + ' « j’ai déjà » <small>sur ' + r.of + ' ' + (r.rank ? '· ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : '') + '</small>') +
+        sec('Mon analyse de pro' + (r.bottle1 ? ' · ' + esc(r.bottle1) : ''), r.note1 ? '« ' + esc(r.note1) + ' »' : none) +
+        '<div class="recap-sec"><div class="label">La différence</div><div style="margin-top:4px">' + diffs + '</div></div>' +
+        sec('Ma dégustation préférée', voteTxt) +
         sec('Mon mot de la soirée', r.closing ? '« ' + esc(r.closing) + ' »' : none) +
         '<div class="recap-foot">' + sprig() + '<span class="label">' + (s.event.place ? esc(s.event.place.split('·')[0].trim()) + '<br>' : '') + 'Martinique</span></div>' +
         '</article>';

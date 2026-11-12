@@ -26,7 +26,8 @@ const io = new Server(server, { maxHttpBufferSize: 12e6, pingInterval: 20000, pi
 /* ------------------------------------------------------------------ */
 /* Contenu                                                             */
 /* ------------------------------------------------------------------ */
-const PHASES = ['LOBBY', 'BODY_COUNT', 'CLASSEMENT', 'BOUTEILLE_1', 'BOUTEILLE_2', 'BOUTEILLE_3', 'CLOTURE', 'RECAP'];
+// Ordre de la soirée : Je n'ai jamais → Classement → Mot Interdit → La différence (BOUTEILLE_3) → Perfect Match (BOUTEILLE_2)
+const PHASES = ['LOBBY', 'BODY_COUNT', 'CLASSEMENT', 'BOUTEILLE_1', 'BOUTEILLE_3', 'BOUTEILLE_2', 'CLOTURE', 'RECAP'];
 
 // Jeu « Je n'ai jamais » : réponse « J'ai déjà » = 1 point
 const DEFAULT_STATEMENTS = [
@@ -118,8 +119,9 @@ const PROFILES = [
 ];
 
 const DEFAULT_FORBIDDEN = ['bon', 'fort', 'sucré', 'sympa', 'bien'];
-const DEFAULT_QUESTION = 'Quel est le prix de cette bouteille ?';
-const DEFAULT_OPTIONS = ['Moins de 30€', 'Entre 30 et 60€', 'Plus de 60€'];
+// « La différence » : QCM sur ce qui distingue la bouteille dégustée de la précédente
+const DEFAULT_QUESTION = 'Qu’est-ce que cette bouteille a de différent de la précédente ?';
+const DEFAULT_OPTIONS = ['Plus boisée', 'Plus fruitée', 'Plus épicée'];
 
 function todayStamp() {
   const parts = new Intl.DateTimeFormat('fr-FR', {
@@ -152,7 +154,6 @@ function defaultConfig() {
     statements: DEFAULT_STATEMENTS.slice(),
     bodyCount: 0, // 0 = automatique (1 affirmation par invité)
     b1: { bottleId: null, forbidden: DEFAULT_FORBIDDEN.slice() },
-    b2: { a: null, b: null },
     paris: [], // { id, bottleId, question, options[3], correct: 0|1|2|null }
   };
 }
@@ -298,7 +299,6 @@ function sanitizeConfig(c, keepTime) {
     statements: [],
     bodyCount: Math.max(0, Math.min(60, parseInt(c.bodyCount, 10) || 0)),
     b1: { bottleId: null, forbidden: d.b1.forbidden },
-    b2: { a: null, b: null },
     paris: [],
   };
   const seen = new Set();
@@ -316,10 +316,6 @@ function sanitizeConfig(c, keepTime) {
     out.b1.bottleId = has(c.b1.bottleId) ? c.b1.bottleId : null;
     const words = (Array.isArray(c.b1.forbidden) ? c.b1.forbidden : []).map((w) => clean(w, 30)).filter(Boolean);
     out.b1.forbidden = [...new Set(words)].slice(0, 30);
-  }
-  if (c.b2) {
-    out.b2.a = has(c.b2.a) ? c.b2.a : null;
-    out.b2.b = has(c.b2.b) ? c.b2.b : null;
   }
   (Array.isArray(c.paris) ? c.paris : []).slice(0, 20).forEach((p) => {
     const opts = (Array.isArray(p && p.options) ? p.options : []).slice(0, 3).map((o) => clean(o, 40));
@@ -341,15 +337,17 @@ const bottleById = (id) => state.config.bottles.find((b) => b.id === id) || null
 const bottleImg = (b) => (b && b.image ? '/bottle/' + b.id + '?v=' + b.rev : null);
 const bottlePublic = (b) => (b ? { id: b.id, name: b.name, image: bottleImg(b) } : null);
 const b1Bottle = () => bottleById(state.config.b1.bottleId);
-function b2Sides() {
-  const A = bottleById(state.config.b2.a);
-  const B = bottleById(state.config.b2.b);
-  return [
-    { label: A ? A.name : 'Bouteille 1', image: bottleImg(A) },
-    { label: B ? B.name : 'Bouteille 2', image: bottleImg(B) },
-  ];
+/* Perfect Match : vote pour la bouteille préférée parmi toutes les bouteilles de la soirée. */
+function matchChoices() {
+  const bs = state.config.bottles.slice(0, 6);
+  if (bs.length) return bs.map((b) => ({ id: b.id, label: b.name, image: bottleImg(b) }));
+  return [1, 2, 3].map((n) => ({ id: 'bouteille-' + n, label: 'Bouteille ' + n, image: null }));
 }
-const b2Labels = () => b2Sides().map((x) => x.label);
+function matchCounts() {
+  const ch = matchChoices();
+  const counts = ch.map((c) => [...state.players.values()].filter((p) => p.vote2 === c.id).length);
+  return { ch, counts, pct: percents(counts), total: counts.reduce((a, b) => a + b, 0) };
+}
 
 function newPlayer(id, pseudo, word, isBot = false) {
   return {
@@ -359,7 +357,7 @@ function newPlayer(id, pseudo, word, isBot = false) {
     body: {}, // index -> true/false
     profile: null,
     note1: null, // { text, ts }
-    vote2: null, // 0 | 1
+    vote2: null, // id de la bouteille préférée (Perfect Match)
     closing: null, // { text, ts }
   };
 }
@@ -410,19 +408,6 @@ function rankOf(pid) {
   if (!state.ranking) return null;
   const r = state.ranking.find((x) => x.id === pid);
   return r ? r.rank : null;
-}
-
-function pctPair(a, b) {
-  const t = a + b;
-  if (!t) return null;
-  const pa = Math.round((a / t) * 100);
-  return [pa, 100 - pa];
-}
-
-function b2Counts() {
-  const c = [0, 0];
-  for (const p of state.players.values()) if (p.vote2 === 0 || p.vote2 === 1) c[p.vote2]++;
-  return c;
 }
 
 function currentRound() {
@@ -501,13 +486,12 @@ function guestView(pid) {
       break;
 
     case 'BOUTEILLE_2': {
-      const c = b2Counts();
+      const m = matchCounts();
       v.b2 = {
-        labels: b2Labels(),
-        images: b2Sides().map((x) => x.image),
+        choices: m.ch.map((c) => ({ id: c.id, label: c.label, image: c.image })),
         locked: state.b2.locked,
         myVote: p ? p.vote2 : null,
-        pct: pctPair(c[0], c[1]), // pourcentages uniquement
+        pct: m.total ? m.pct : null, // pourcentages globaux uniquement, jamais de noms ni de comptes
       };
       break;
     }
@@ -555,14 +539,15 @@ function guestView(pid) {
 }
 
 function recapFor(p) {
-  const c = b2Counts();
+  const m = matchCounts();
   let vote = null;
-  if (p.vote2 === 0 || p.vote2 === 1) {
-    const mine = c[p.vote2];
-    const other = c[1 - p.vote2];
+  const vi = m.ch.findIndex((c) => c.id === p.vote2);
+  if (vi >= 0) {
+    const max = Math.max(...m.counts);
+    const leaders = m.counts.filter((x) => x === max).length;
     vote = {
-      label: b2Labels()[p.vote2],
-      side: mine > other ? 'majorite' : mine < other ? 'minorite' : 'egalite',
+      label: m.ch[vi].label,
+      side: m.counts[vi] === max ? (leaders > 1 ? 'egalite' : 'majorite') : 'minorite',
     };
   }
   const paris = state.b3.rounds
@@ -597,7 +582,7 @@ function hostView() {
   const list = playersList();
   const online = connectedIds();
   const byId = (id) => state.players.get(id);
-  const c2 = b2Counts();
+  const m2 = matchCounts();
   const i = state.body.index;
   return {
     role: 'host',
@@ -629,7 +614,6 @@ function hostView() {
       statementsCount: state.config.statements.length,
       bodyCount: state.config.bodyCount,
       b1: { ...state.config.b1 },
-      b2: { ...state.config.b2 },
       paris: state.config.paris.map((p) => ({ ...p, played: state.b3.rounds.some((r) => r.planId === p.id) })),
     },
     b1: {
@@ -639,14 +623,13 @@ function hostView() {
       wall: list.filter((p) => p.note1).sort((a, b) => b.note1.ts - a.note1.ts).map((p) => ({ pseudo: p.pseudo, text: p.note1.text })),
     },
     b2: {
-      labels: b2Labels(),
-      a: state.config.b2.a,
-      b: state.config.b2.b,
+      choices: m2.ch,
       locked: state.b2.locked,
-      counts: c2,
-      pct: pctPair(c2[0], c2[1]),
-      voters: [0, 1].map((side) => list.filter((p) => p.vote2 === side).map((p) => p.pseudo)),
-      abstain: list.filter((p) => p.vote2 !== 0 && p.vote2 !== 1).map((p) => p.pseudo),
+      counts: m2.counts,
+      pct: m2.pct,
+      total: m2.total,
+      voters: m2.ch.map((c) => list.filter((p) => p.vote2 === c.id).map((p) => p.pseudo)),
+      abstain: list.filter((p) => !m2.ch.some((c) => c.id === p.vote2)).map((p) => p.pseudo),
     },
     b3: {
       currentId: state.b3.currentId,
@@ -723,7 +706,7 @@ function botsPlay() {
         if (!b.note1) b.note1 = { text: pick(BOT_NOTES), ts: now + k };
         break;
       case 'BOUTEILLE_2':
-        if (!state.b2.locked) b.vote2 = Math.random() < 0.6 ? 0 : 1;
+        if (!state.b2.locked) { const ch = matchChoices(); b.vote2 = ch[Math.floor(Math.random() * ch.length)].id; }
         break;
       case 'BOUTEILLE_3': {
         const r = currentRound();
@@ -809,8 +792,8 @@ io.on('connection', (socket) => {
     if (!p) return fail(ack, 'Rejoins d’abord la partie.');
     if (state.phase !== 'BOUTEILLE_2') return fail(ack, 'Ce n’est plus le moment.');
     if (state.b2.locked) return fail(ack, 'Les votes sont verrouillés.');
-    if (msg.side !== 0 && msg.side !== 1) return fail(ack, 'Vote invalide.');
-    p.vote2 = msg.side;
+    if (!matchChoices().some((c) => c.id === msg.choice)) return fail(ack, 'Vote invalide.');
+    p.vote2 = msg.choice;
     ok(ack);
     broadcast();
   });
@@ -944,11 +927,6 @@ function hostAction(a) {
       touchConfig();
       return;
     }
-    case 'configB2':
-      state.config.b2.a = bottleById(a.a) ? a.a : null;
-      state.config.b2.b = bottleById(a.b) ? a.b : null;
-      touchConfig();
-      return;
     case 'b2Lock':
       state.b2.locked = !!a.locked;
       return;

@@ -4,7 +4,7 @@
   const PW_KEY = 'adv_host_pw';
   const PHASE_LABELS = {
     LOBBY: 'Accueil', BODY_COUNT: 'Je n’ai jamais', CLASSEMENT: 'Classement', BOUTEILLE_1: 'Mot Interdit',
-    BOUTEILLE_2: 'Le Match', BOUTEILLE_3: 'Juste Prix', CLOTURE: 'Mur de mots', RECAP: 'Fiches récap',
+    BOUTEILLE_2: 'Perfect Match', BOUTEILLE_3: 'La différence', CLOTURE: 'Mur de mots', RECAP: 'Fiches récap',
   };
 
   const $ = (id) => document.getElementById(id);
@@ -151,7 +151,7 @@
           const nb = h.config.bodyCount || Math.min(h.players.length, c.statementsCount) || 0;
           q('prepSum').innerHTML = '<div class="label gold">Préparation</div>' +
             '<p style="margin:8px 0 4px">' + esc(h.event.subtitle || '') + ' · ' + esc(h.event.date) + ' · thème ' + (h.event.theme === 'champagne' ? 'Champagne' : 'Whisky') + '</p>' +
-            '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' pari(s) préparé(s) · Je n’ai jamais : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
+            '<p class="muted" style="margin:0 0 12px">' + c.bottles.length + ' bouteille(s) · ' + c.paris.length + ' question(s) « La différence » · Je n’ai jamais : ' + nb + ' affirmation(s) (' + (h.config.bodyCount ? 'réglage manuel' : '1 par invité') + ')</p>' +
             '<div style="margin:-4px 0 12px;font-size:.82rem">' + cloudLine(h) + '</div>' +
             '<button class="btn small ghost" id="goPrep">Ouvrir la préparation</button>';
           q('goPrep').onclick = () => { prepMode = true; mountedKey = null; render(); };
@@ -232,22 +232,15 @@
       };
     },
 
-    BOUTEILLE_2(root, h) {
+    BOUTEILLE_2(root) {
       root.innerHTML =
-        '<form class="card" id="cfg"><div class="label gold">Configuration · Le Match</div><div class="grid2">' +
-        '<label class="field"><span class="label">Côté A</span><select class="input" id="la"></select></label>' +
-        '<label class="field"><span class="label">Côté B</span><select class="input" id="lb"></select></label></div>' +
-        '<button class="btn small" type="submit">Enregistrer</button></form>' +
-        '<div class="card"><div class="label">Ce que voient les invités</div><div class="split" id="split"><div class="a" id="pa"></div><div class="b" id="pb"></div></div>' +
-        '<p class="muted" id="none">Aucun vote pour l’instant.</p>' +
+        '<div class="card"><div class="label gold">Perfect Match · ce que voient les invités</div>' +
+        '<p class="muted" style="font-size:.85rem;margin:6px 0 8px">Chaque invité choisit sa bouteille préférée parmi toutes les bouteilles de la soirée (définies dans « Préparation »). Ils ne voient que les pourcentages.</p>' +
+        '<div class="pm-list" id="list"></div>' +
         '<div class="btn-row" style="margin-top:14px"><button class="btn red" id="lock"></button><button class="btn ghost small" id="reset">Effacer les votes</button></div></div>' +
-        '<div class="card host-exclusive"><div class="label">Réservé à l’animateur · qui a voté quoi</div><div class="grid2" style="margin-top:8px">' +
-        '<div><h3 id="na"></h3><div id="va"></div></div><div><h3 id="nb" style="color:var(--rouge)"></h3><div id="vb"></div></div></div>' +
+        '<div class="card host-exclusive"><div class="label">Réservé à l’animateur · qui a voté quoi</div><div id="who" style="margin-top:8px"></div>' +
         '<div class="label" style="margin-top:12px">Pas encore voté</div><div id="abs"></div></div>';
       const q = (id) => root.querySelector('#' + id);
-      q('la').innerHTML = bottleOptions(h, h.b2.a);
-      q('lb').innerHTML = bottleOptions(h, h.b2.b);
-      q('cfg').onsubmit = (e) => { e.preventDefault(); act('configB2', { a: q('la').value || null, b: q('lb').value || null }).then((r) => r.ok && toast('Enregistré')); };
       let locked = false;
       q('lock').onclick = () => act('b2Lock', { locked: !locked });
       confirmBtn(q('reset'), 'Confirmer ?', () => act('b2Reset'));
@@ -257,17 +250,13 @@
           locked = b.locked;
           q('lock').textContent = b.locked ? 'Déverrouiller les votes' : 'Verrouiller les votes';
           q('lock').classList.toggle('ghost', b.locked);
-          q('split').classList.toggle('hidden', !b.pct);
-          q('none').classList.toggle('hidden', !!b.pct);
-          if (b.pct) {
-            q('pa').style.flexBasis = b.pct[0] + '%'; q('pb').style.flexBasis = b.pct[1] + '%';
-            q('pa').textContent = b.pct[0] >= 10 ? b.pct[0] + '%' : '';
-            q('pb').textContent = b.pct[1] >= 10 ? b.pct[1] + '%' : '';
-          }
-          q('na').textContent = b.labels[0] + ' · ' + b.counts[0];
-          q('nb').textContent = b.labels[1] + ' · ' + b.counts[1];
-          q('va').innerHTML = names(b.voters[0]);
-          q('vb').innerHTML = names(b.voters[1], 'yes');
+          q('list').innerHTML = b.choices.map((c, i) =>
+            '<div class="pm-choice" style="cursor:default">' +
+            (c.image ? '<img src="' + esc(c.image) + '" alt="">' : '<span class="pm-noimg">' + (i + 1) + '</span>') +
+            '<span class="pm-body"><span class="pm-name">' + esc(c.label) + '</span><span class="pm-bar"><span class="pm-fill" style="width:' + b.pct[i] + '%"></span></span></span>' +
+            '<span class="pm-pct">' + (b.total ? b.pct[i] + '%' : '') + '</span></div>').join('');
+          q('who').innerHTML = b.choices.map((c, i) =>
+            '<div style="margin-bottom:10px"><strong>' + esc(c.label) + ' · ' + b.counts[i] + '</strong>' + names(b.voters[i], i === 0 ? 'yes' : '') + '</div>').join('');
           q('abs').innerHTML = names(b.abstain);
         },
       };
@@ -276,16 +265,16 @@
     BOUTEILLE_3(root, h) {
       root.innerHTML =
         '<div class="card" id="cur"></div>' +
-        '<div class="card"><div class="label gold">Paris préparés</div><div id="plans" style="margin-top:8px"></div></div>' +
-        '<details class="card"><summary class="label" style="cursor:pointer">Pari improvisé (hors préparation)</summary>' +
+        '<div class="card"><div class="label gold">Questions préparées · La différence</div><div id="plans" style="margin-top:8px"></div></div>' +
+        '<details class="card"><summary class="label" style="cursor:pointer">Question improvisée (hors préparation)</summary>' +
         '<form id="cfg" style="margin-top:8px"><div class="grid2">' +
         '<label class="field"><span class="label">Nom de la bouteille</span><input class="input" id="bottle"></label>' +
         '<label class="field"><span class="label">Visuel (photo, optionnel)</span><input class="input" type="file" accept="image/*" id="img"><img class="img-prev hidden" id="prev" alt=""></label></div>' +
         '<label class="field"><span class="label">Question</span><input class="input" id="question"></label>' +
         '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' +
         [0, 1, 2].map((i) => '<label class="field"><span class="label">Option ' + (i + 1) + '</span><input class="input opt" required></label>').join('') + '</div>' +
-        '<button class="btn red" type="submit" id="launch">Lancer ce pari</button></form></details>' +
-        '<div class="card"><div class="label">Paris joués</div><div class="round-hist" id="hist" style="margin-top:8px"></div></div>';
+        '<button class="btn red" type="submit" id="launch">Lancer cette question</button></form></details>' +
+        '<div class="card"><div class="label">Questions jouées</div><div class="round-hist" id="hist" style="margin-top:8px"></div></div>';
       const q = (id) => root.querySelector('#' + id);
       const opts = [...root.querySelectorAll('.opt')];
       q('question').value = h.b3.defaults.question;
@@ -305,7 +294,7 @@
         e.preventDefault();
         const r = await act('b3Launch', { bottle: q('bottle').value, image: imageUrl, question: q('question').value, options: opts.map((o) => o.value) });
         if (r.ok) {
-          toast('Pari lancé');
+          toast('Question lancée');
           q('bottle').value = ''; q('img').value = ''; imageUrl = null; q('prev').classList.add('hidden');
         }
       };
@@ -328,18 +317,18 @@
                 '<div style="flex:1"><strong>' + (i + 1) + '. ' + esc(b ? b.name : 'Bouteille ?') + '</strong><br><span class="muted" style="font-size:.82rem">' + esc(p.options.join(' / ')) + (p.correct !== null ? ' · bonne réponse : ' + esc(p.options[p.correct]) : '') + '</span></div>' +
                 '<button class="btn small ' + (p.played ? 'ghost' : '') + '" data-plan="' + esc(p.id) + '">' + (p.played ? 'Relancer' : 'Lancer') + '</button></div>';
             }).join('')
-            : '<p class="muted" style="margin:0">Aucun pari préparé. Ajoute-les dans « Préparation ».</p>';
+            : '<p class="muted" style="margin:0">Aucune question préparée. Ajoute-les dans « Préparation ».</p>';
           if (q('plans').dataset.html !== plansHtml) {
             q('plans').dataset.html = plansHtml;
             q('plans').innerHTML = plansHtml;
-            q('plans').querySelectorAll('[data-plan]').forEach((b) => { b.onclick = () => act('b3Launch', { planId: b.dataset.plan }).then((x) => x.ok && toast('Pari lancé')); });
+            q('plans').querySelectorAll('[data-plan]').forEach((b) => { b.onclick = () => act('b3Launch', { planId: b.dataset.plan }).then((x) => x.ok && toast('Question lancée')); });
           }
-          if (!r) { q('cur').innerHTML = '<div class="label">Pari en cours</div><p class="muted">Aucun pari lancé : les invités voient un écran d’attente. Lance un pari préparé ci-dessous.</p>'; curKey = null; return; }
+          if (!r) { q('cur').innerHTML = '<div class="label">Question en cours</div><p class="muted">Aucune question lancée : les invités voient un écran d’attente. Lance une question préparée ci-dessous.</p>'; curKey = null; return; }
           const k = r.id;
           if (curKey !== k) {
             curKey = k;
             q('cur').innerHTML =
-              '<div class="label gold">Pari en cours · n°' + r.number + '</div>' +
+              '<div class="label gold">La différence · question n°' + r.number + '</div>' +
               '<div style="display:flex;gap:16px;align-items:center;margin-top:8px">' + (r.image ? '<img src="' + esc(r.image) + '" style="height:90px;border:1px solid var(--or)">' : '') +
               '<div><h3>' + esc(r.bottle || 'Bouteille') + '</h3><div class="serif" style="font-style:italic;font-size:1.15rem">' + esc(r.question) + '</div></div></div>' +
               '<div id="opts"></div>' +
@@ -450,12 +439,12 @@
         '<label class="field"><span class="label">Bouteille</span><select class="input" id="b1b">' + bOpts(draft.b1.bottleId) + '</select></label>' +
         '<label class="field"><span class="label">Mots interdits (virgules)</span><input class="input" id="b1w"></label></div></div>' +
 
-        '<div class="card"><div class="label gold">5 · Le Match</div><div class="grid2">' +
-        '<label class="field"><span class="label">Côté A</span><select class="input" id="b2a">' + bOpts(draft.b2.a) + '</select></label>' +
-        '<label class="field"><span class="label">Côté B</span><select class="input" id="b2b">' + bOpts(draft.b2.b) + '</select></label></div></div>' +
 
-        '<div class="card"><div class="label gold">6 · Le Juste Prix — paris préparés</div>' +
-        '<div id="paris"></div><button class="btn small ghost" id="addPari" style="margin-top:12px">+ Ajouter un pari</button></div>' +
+        '<div class="card"><div class="label gold">5 · La différence — une question par bouteille</div>' +
+        '<p class="muted" style="font-size:.85rem;margin:6px 0 4px">Pour chaque bouteille : qu’a-t-elle de différent de la précédente ? 3 réponses possibles, dont la bonne.</p>' +
+        '<div id="paris"></div><button class="btn small ghost" id="addPari" style="margin-top:12px">+ Ajouter une question</button></div>' +
+        '<div class="card"><div class="label gold">6 · Perfect Match (dernier jeu)</div>' +
+        '<p class="muted" style="font-size:.85rem;margin:6px 0 0">Rien à régler : les invités votent pour leur bouteille préférée parmi toutes les bouteilles de la section 2.</p></div>' +
 
         '<div class="card" style="position:sticky;bottom:10px;z-index:5;background:var(--bg-2);display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
         '<button class="btn" id="save">Enregistrer la préparation</button>' +
@@ -523,19 +512,17 @@
       q('#b1w').value = draft.b1.forbidden.join(', ');
       q('#b1w').addEventListener('input', () => { draft.b1.forbidden = q('#b1w').value.split(',').map((x) => x.trim()).filter(Boolean); markDirty(); });
       q('#b1b').onchange = () => { draft.b1.bottleId = q('#b1b').value || null; markDirty(); };
-      q('#b2a').onchange = () => { draft.b2.a = q('#b2a').value || null; markDirty(); };
-      q('#b2b').onchange = () => { draft.b2.b = q('#b2b').value || null; markDirty(); };
 
       // Paris
       q('#paris').innerHTML = draft.paris.length ? draft.paris.map((p, i) =>
         '<div style="padding:12px 0;border-bottom:1px solid rgba(253,252,241,.08)"><div class="grid2">' +
-        '<label class="field" style="margin:6px 0"><span class="label">Pari ' + (i + 1) + ' · bouteille</span><select class="input" data-pb="' + i + '">' + bOpts(p.bottleId) + '</select></label>' +
+        '<label class="field" style="margin:6px 0"><span class="label">Question ' + (i + 1) + ' · bouteille dégustée</span><select class="input" data-pb="' + i + '">' + bOpts(p.bottleId) + '</select></label>' +
         '<label class="field" style="margin:6px 0"><span class="label">Question</span><input class="input" data-pq="' + i + '"></label></div>' +
         '<div class="grid2" style="grid-template-columns:repeat(3,1fr)">' + [0, 1, 2].map((k) => '<label class="field" style="margin:6px 0"><span class="label">Option ' + (k + 1) + '</span><input class="input" data-po="' + i + ':' + k + '"></label>').join('') + '</div>' +
         '<div style="display:flex;gap:10px;align-items:end"><label class="field" style="margin:6px 0;flex:1"><span class="label">Bonne réponse (pré-cochée au moment de révéler)</span><select class="input" data-pc="' + i + '"><option value="">— je choisirai en direct —</option>' +
         [0, 1, 2].map((k) => '<option value="' + k + '"' + (p.correct === k ? ' selected' : '') + '>Option ' + (k + 1) + '</option>').join('') + '</select></label>' +
         '<button class="btn small ghost" data-pd="' + i + '" style="margin-bottom:6px">Supprimer</button></div></div>').join('')
-        : '<p class="muted" style="margin:6px 0 0">Aucun pari préparé.</p>';
+        : '<p class="muted" style="margin:6px 0 0">Aucune question préparée.</p>';
       root.querySelectorAll('[data-pq]').forEach((el) => { el.value = draft.paris[el.dataset.pq].question; el.addEventListener('input', () => { draft.paris[el.dataset.pq].question = el.value; markDirty(); }); });
       root.querySelectorAll('[data-po]').forEach((el) => {
         const [i, k] = el.dataset.po.split(':').map(Number);
@@ -569,7 +556,7 @@
       if (dirty) markDirty();
     }
     function refreshSelects() {
-      [['#b1b', draft.b1.bottleId], ['#b2a', draft.b2.a], ['#b2b', draft.b2.b]].forEach(([sel, v]) => { const el = root.querySelector(sel); if (el) el.innerHTML = bOpts(v); });
+      [['#b1b', draft.b1.bottleId]].forEach(([sel, v]) => { const el = root.querySelector(sel); if (el) el.innerHTML = bOpts(v); });
       root.querySelectorAll('[data-pb]').forEach((el) => { el.innerHTML = bOpts(draft.paris[el.dataset.pb].bottleId); });
     }
     function redraw() { const y = window.scrollY; draw(); window.scrollTo(0, y); }
