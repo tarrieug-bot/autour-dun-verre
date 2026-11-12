@@ -73,11 +73,12 @@
   }
 
   const hero = (s) =>
-    '<section class="hero"><div class="hero-band"></div>' +
+    '<section class="hero">' +
+    (s.event.orga ? '<div class="orga-top"><span>' + esc(s.event.orga) + '</span><em>vous font Vivre</em></div>' : '') +
+    '<div class="hero-band"></div>' +
     '<img class="hero-logo" src="/logo.png" alt="' + esc(s.event.title) + '">' +
     (s.event.subtitle ? '<div class="sub glow">' + esc(s.event.subtitle) + '</div>' : '') +
     '<div class="meta">' + [s.event.date, s.event.place].filter(Boolean).map(esc).join(' · ') + '</div>' +
-    (s.event.orga ? '<div class="orga" style="margin-top:14px">' + esc(s.event.orga) + ' <em>vous font vivre</em></div>' : '') +
     '</section>';
 
   const head = (label, title, sub) =>
@@ -382,7 +383,7 @@
       root.innerHTML =
         '<p class="center label" style="margin-bottom:10px">Ta fiche‑souvenir · fais une capture d’écran</p>' +
         '<article class="recap">' +
-        '<div class="recap-head"><div class="band"></div><img class="logo" src="/logo.png" alt="">' +
+        '<div class="recap-head">' + (s.event.orga ? '<div class="orga-top small"><span>' + esc(s.event.orga) + '</span><em>vous font Vivre</em></div>' : '') + '<div class="band"></div><img class="logo" src="/logo.png" alt="">' +
         (s.event.subtitle ? '<span class="label gold">' + esc(s.event.subtitle) + '</span>' : '') +
         '<span class="label" style="margin-top:4px">' + esc(s.event.date) + '</span>' +
         '<h1>' + esc(r.pseudo) + '</h1><div class="word">« ' + esc(r.word) + ' »</div>' + stamp(s.event.date, 'souvenir') + '</div>' +
