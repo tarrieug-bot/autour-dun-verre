@@ -65,15 +65,33 @@
     ]).catch(() => {});
     const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
     const imgs = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png')]);
-    let last = null;
-    for (const k of [1, 0.94, 0.88, 0.82, 0.76, 0.7]) {
-      last = drawOnce(s, r, k, imgs);
-      if (last.bottom <= H - 140) return last.canvas;
+    // Plus grande taille de texte qui tient dans l'image (recherche par dichotomie)
+    // 1) on réduit d'abord l'en-tête (jusqu'à 70 %), 2) puis seulement le texte des rubriques
+    const LIMIT = H - 130;
+    let best = drawOnce(s, r, 1, imgs, 1);
+    if (best.bottom <= LIMIT) return best.canvas;
+    const HMIN = 0.7;
+    let res = drawOnce(s, r, 1, imgs, HMIN);
+    if (res.bottom <= LIMIT) {
+      let lo = HMIN, hi = 1; best = res;
+      for (let i = 0; i < 7; i++) {
+        const mid = (lo + hi) / 2;
+        const t = drawOnce(s, r, 1, imgs, mid);
+        if (t.bottom <= LIMIT) { lo = mid; best = t; } else hi = mid;
+      }
+      return best.canvas;
     }
-    return last.canvas;
+    let lo = 0.55, hi = 1;
+    best = drawOnce(s, r, lo, imgs, HMIN);
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      const t = drawOnce(s, r, mid, imgs, HMIN);
+      if (t.bottom <= LIMIT) { lo = mid; best = t; } else hi = mid;
+    }
+    return best.canvas;
   }
 
-  function drawOnce(s, r, k, [band, logo]) {
+  function drawOnce(s, r, k, [band, logo], kh) {
     const C = {
       bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
       accent2: cssVar('--accent-2') || '#F59A45', gold: cssVar('--gold') || '#EDB867', cream: '#FDFCF1',
@@ -83,7 +101,8 @@
     cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     ctx.textBaseline = 'alphabetic';
-    const px = (n) => Math.round(n * k);
+    const px = (n, min) => Math.max(min || 0, Math.round(n * k));
+    const ph = (n, min) => Math.max(min || 0, Math.round(n * kh)); // en-tête
     const maxW = W - 2 * M;
 
     // Mesures de ligne (ascendante / descendante réelles de la police)
@@ -97,10 +116,15 @@
     let y = 0;
     /* Écrit une ou plusieurs lignes à partir du curseur y (haut du bloc), puis avance le curseur. */
     function text(lines, font, opt) {
-      const o = Object.assign({ align: 'center', x: W / 2, color: C.cream, spacing: 0, lead: 0.22, glow: null }, opt || {});
-      const { asc, desc } = metrics(font);
+      const o = Object.assign({ align: 'center', x: W / 2, color: C.cream, spacing: 0, lead: 0.08, glow: null, tight: false }, opt || {});
+      let { asc, desc } = metrics(font);
+      if (o.tight) { // hauteur réelle des lettres (lignes uniques du haut)
+        ctx.font = font;
+        const m = ctx.measureText(lines.join(' ') + 'É');
+        asc = m.actualBoundingBoxAscent; desc = Math.max(m.actualBoundingBoxDescent, asc * 0.22);
+      }
       const lh = asc + desc;
-      const gapLine = Math.max(10, lh * o.lead);
+      const gapLine = Math.max(8, lh * o.lead);
       ctx.fillStyle = o.color;
       ctx.textAlign = o.align === 'center' ? 'center' : 'left';
       if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = 22; }
@@ -112,7 +136,7 @@
       ctx.shadowBlur = 0;
       y += lines.length * lh + (lines.length - 1) * gapLine;
     }
-    const space = (n) => { y += Math.max(12, Math.round(n * k)); };
+    const space = (n, scale) => { y += Math.max(12, Math.round(n * (scale || k))); };
     const fitSpaced = (str, weight, size, spacing, max) => {
       let fs = size, sp = spacing;
       ctx.font = weight + ' ' + fs + 'px ' + SANS;
@@ -128,40 +152,40 @@
     // ---------- Bloc du haut (le visuel du verre en fond est posé une fois sa hauteur connue) ----------
     // On mesure d'abord le bloc à vide pour connaître sa hauteur, puis on dessine le fond et le texte.
     const top = () => {
-      y = FRAME + px(70);
+      y = FRAME + ph(70);
       if (s.event.orga) {
-        const f = fitSpaced(s.event.orga.toUpperCase(), '400', px(30), 6, maxW);
-        text([s.event.orga.toUpperCase()], f.font, { spacing: f.spacing });
-        space(14);
-        text(['vous font Vivre'], 'italic 500 ' + px(46) + 'px ' + SERIF);
-        space(46);
+        const f = fitSpaced(s.event.orga.toUpperCase(), '400', ph(30), 6, maxW);
+        text([s.event.orga.toUpperCase()], f.font, { spacing: f.spacing, tight: true });
+        space(14, kh);
+        text(['vous font Vivre'], 'italic 500 ' + ph(46) + 'px ' + SERIF, { tight: true });
+        space(46, kh);
       }
       if (logo) {
-        const lw = px(600), lh = (logo.height / logo.width) * lw;
+        const lw = ph(600), lh = (logo.height / logo.width) * lw;
         if (drawing) {
           ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 26;
           ctx.drawImage(logo, (W - lw) / 2, y, lw, lh);
           ctx.shadowBlur = 0;
         }
         y += lh;
-        space(40);
+        space(40, kh);
       }
       if (s.event.subtitle) {
-        const f = fitSpaced(s.event.subtitle.toUpperCase(), '600', px(32), 7, maxW);
-        if (drawing) text([s.event.subtitle.toUpperCase()], f.font, { spacing: f.spacing, color: C.accent2, glow: C.accent });
-        else text(['X'], f.font);
-        space(18);
+        const f = fitSpaced(s.event.subtitle.toUpperCase(), '600', ph(32), 7, maxW);
+        if (drawing) text([s.event.subtitle.toUpperCase()], f.font, { spacing: f.spacing, color: C.accent2, glow: C.accent, tight: true });
+        else text([s.event.subtitle.toUpperCase()], f.font, { tight: true });
+        space(18, kh);
       }
       const meta = [s.event.date, s.event.place].filter(Boolean).join(' · ').toUpperCase();
       if (meta) {
-        const f = fitSpaced(meta, '400', px(26), 5, maxW);
-        if (drawing) text([meta], f.font, { spacing: f.spacing, color: C.soft }); else text(['X'], f.font);
-        space(56);
+        const f = fitSpaced(meta, '400', ph(26), 5, maxW);
+        if (drawing) text([meta], f.font, { spacing: f.spacing, color: C.soft, tight: true }); else text([meta], f.font, { tight: true });
+        space(56, kh);
       }
-      text([r.pseudo], 'italic 500 ' + px(104) + 'px ' + SERIF);
-      space(18);
-      text(['« ' + r.word + ' »'], 'italic 500 ' + px(44) + 'px ' + SERIF, { color: C.accent2 });
-      space(56);
+      text([r.pseudo], 'italic 500 ' + ph(104) + 'px ' + SERIF, { tight: true });
+      space(26, kh);
+      text(['« ' + r.word + ' »'], 'italic 500 ' + ph(44) + 'px ' + SERIF, { color: C.accent2, tight: true });
+      space(56, kh);
       return y;
     };
     let drawing = false;
@@ -190,29 +214,29 @@
       const varName = (r.profile.color.match(/var\((--[^)]+)\)/) || [])[1];
       const pc = (varName && cssVar(varName)) || C.accent;
       const y0 = y;
-      y += px(30);
+      y += ph(30);
       ctx.save();
       const yStart = y;
       // mesure puis fond
       ctx.fillText = () => {};
-      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + px(24) + 'px ' + SANS, { spacing: 6 });
-      space(14);
-      text([r.profile.name], 'italic 500 ' + px(62) + 'px ' + SERIF);
+      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, tight: true });
+      space(18, kh);
+      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true });
       ctx.fillText = ctxFill;
-      const h = y - y0 + px(30);
+      const h = y - y0 + ph(30);
       ctx.restore();
       ctx.fillStyle = pc; ctx.fillRect(FRAME, y0, W - 2 * FRAME, h);
       y = yStart;
-      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + px(24) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)' });
-      space(14);
-      text([r.profile.name], 'italic 500 ' + px(62) + 'px ' + SERIF);
+      text(['PROFIL DE DÉGUSTATEUR'], '400 ' + ph(24, 22) + 'px ' + SANS, { spacing: 6, color: 'rgba(253,252,241,.88)', tight: true });
+      space(18, kh);
+      text([r.profile.name], 'italic 500 ' + ph(62) + 'px ' + SERIF, { tight: true });
       y = y0 + h;
     }
 
     // ---------- Sections ----------
     const L = { x: M, align: 'left' };
-    const label = (t) => { text([t.toUpperCase()], '400 ' + px(24) + 'px ' + SANS, Object.assign({ spacing: 5, color: 'rgba(253,252,241,.6)' }, L)); space(18); };
-    const rule = () => { space(30); ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(W - M, y); ctx.stroke(); space(34); };
+    const label = (t) => { text([t.toUpperCase()], '400 ' + px(24, 22) + 'px ' + SANS, Object.assign({ spacing: 5, color: 'rgba(253,252,241,.6)' }, L)); space(16); };
+    const rule = () => { space(26); ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(W - M, y); ctx.stroke(); space(30); };
     space(48);
 
     // Je n'ai jamais
@@ -225,7 +249,7 @@
       ctx.fillText(main, M, y + asc);
       if (r.score !== null) {
         const w0 = ctx.measureText(main + '  ').width;
-        ctx.font = '400 ' + px(26) + 'px ' + SANS; ctx.fillStyle = C.soft;
+        ctx.font = '400 ' + px(28, 25) + 'px ' + SANS; ctx.fillStyle = C.soft;
         ctx.fillText('sur ' + r.of + (r.rank ? ' · ' + r.rank + (r.rank === 1 ? 'er' : 'e') + ' sur ' + r.total : ''), M + w0, y + asc);
       }
       text(['X'], fMain, { color: 'transparent' }); // avance le curseur
@@ -237,7 +261,7 @@
     {
       const f = 'italic 500 ' + px(40) + 'px ' + SERIF;
       ctx.font = f;
-      text(wrap(ctx, r.note1 ? '« ' + r.note1 + ' »' : '—', maxW, 3), f, Object.assign({ lead: 0.28 }, L));
+      text(wrap(ctx, r.note1 ? '« ' + r.note1 + ' »' : '—', maxW, 3), f, Object.assign({ lead: 0.1 }, L));
     }
     rule();
 
@@ -249,25 +273,25 @@
       else {
         const fName = '500 ' + px(40) + 'px ' + SERIF;
         const pill = d.won === null ? '—' : d.won ? 'TROUVÉ' : 'RATÉ';
-        ctx.font = '600 ' + px(22) + 'px ' + SANS;
+        ctx.font = '600 ' + px(22, 20) + 'px ' + SANS;
         const pw = spacedWidth(ctx, pill, 4) + 40, ph = px(44);
         ctx.font = fName;
         const nameLines = wrap(ctx, d.bottle, maxW - pw - 30, 2);
         const yName = y;
-        text(nameLines, fName, Object.assign({ lead: 0.25 }, L));
+        text(nameLines, fName, Object.assign({ lead: 0.08 }, L));
         // pastille alignée sur la 1re ligne
         const { asc, desc } = metrics(fName);
         const cy = yName + (asc + desc) / 2;
         roundRect(ctx, W - M - pw, cy - ph / 2, pw, ph, ph / 2);
         if (d.won) { ctx.fillStyle = C.accent2; ctx.fill(); } else { ctx.strokeStyle = 'rgba(253,252,241,.4)'; ctx.lineWidth = 2; ctx.stroke(); }
-        ctx.font = '600 ' + px(22) + 'px ' + SANS; ctx.fillStyle = d.won ? C.bg : 'rgba(253,252,241,.7)';
+        ctx.font = '600 ' + px(22, 20) + 'px ' + SANS; ctx.fillStyle = d.won ? C.bg : 'rgba(253,252,241,.7)';
         const pm = ctx.measureText('T');
         spaced(ctx, pill, W - M - pw / 2, cy + (pm.actualBoundingBoxAscent || px(16)) / 2, 4, 'center');
         if (d.explanation) {
           space(16);
-          const fE = 'italic 500 ' + px(32) + 'px ' + SERIF;
+          const fE = 'italic 500 ' + px(34, 28) + 'px ' + SERIF;
           ctx.font = fE;
-          text(wrap(ctx, d.explanation, maxW, 3), fE, Object.assign({ color: 'rgba(253,252,241,.8)', lead: 0.3 }, L));
+          text(wrap(ctx, d.explanation, maxW, 3), fE, Object.assign({ color: 'rgba(253,252,241,.8)', lead: 0.1 }, L));
         }
       }
     }
@@ -278,9 +302,9 @@
     if (r.vote) {
       const f = '500 ' + px(42) + 'px ' + SERIF;
       ctx.font = f;
-      text(wrap(ctx, r.vote.label, maxW, 2), f, Object.assign({ lead: 0.25 }, L));
+      text(wrap(ctx, r.vote.label, maxW, 2), f, Object.assign({ lead: 0.08 }, L));
       space(12);
-      text([r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête'], '400 ' + px(26) + 'px ' + SANS, Object.assign({ color: C.soft }, L));
+      text([r.vote.side === 'majorite' ? 'comme la majorité' : r.vote.side === 'minorite' ? 'un choix singulier' : 'à égalité en tête'], '400 ' + px(28, 25) + 'px ' + SANS, Object.assign({ color: C.soft }, L));
     } else text(['—'], '500 ' + px(42) + 'px ' + SERIF, L);
     rule();
 
@@ -289,7 +313,7 @@
     {
       const f = 'italic 500 ' + px(42) + 'px ' + SERIF;
       ctx.font = f;
-      text(wrap(ctx, r.closing ? '« ' + r.closing + ' »' : '—', maxW, 2), f, Object.assign({ lead: 0.28 }, L));
+      text(wrap(ctx, r.closing ? '« ' + r.closing + ' »' : '—', maxW, 2), f, Object.assign({ lead: 0.1 }, L));
     }
     const bottom = y;
 
