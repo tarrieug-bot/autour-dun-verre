@@ -9,7 +9,11 @@
   function loadImg(src) {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve(img);
+      img.onload = () => {
+        // SVG sans taille intrinsèque : on lui en donne une pour le canvas
+        if (!img.naturalWidth || !img.naturalHeight) { img.width = 600; img.height = 1000; }
+        resolve(img);
+      };
       img.onerror = () => resolve(null);
       img.src = src;
     });
@@ -314,7 +318,7 @@
   async function drawBottles(s, r) {
     await document.fonts.load('italic 500 60px "Bodoni Moda"').catch(() => {});
     const theme = s.event.theme === 'champagne' ? 'champagne' : 'whisky';
-    const bottles = (r.bottles || []).slice(0, 4);
+    const bottles = (r.bottles || []).filter(Boolean).slice(0, 8);
     const [band, logo, ...photos] = await Promise.all([loadImg('/band-' + theme + '.jpg'), loadImg('/logo.png'), ...bottles.map((b) => (b.image ? loadImg(b.image) : Promise.resolve(null)))]);
     const C = {
       bg: cssVar('--bg') || '#120604', bg2: cssVar('--bg-2') || '#2A0C06', accent: cssVar('--accent') || '#E8592A',
@@ -373,25 +377,31 @@
 
     // Les bouteilles côte à côte
     const n = Math.max(1, bottles.length);
-    const gap = 30;
-    const cw = Math.floor((maxW - gap * (n - 1)) / n);
-    const nameFont = 'italic 500 ' + (n >= 4 ? 32 : 38) + 'px ' + SERIF;
+    const rows = n <= 4 ? 1 : 2;               // au-delà de 4 bouteilles : 2 rangées
+    const cols = Math.ceil(n / rows);
+    const gap = 30, rowGap = 40;
+    const cw = Math.floor((maxW - gap * (cols - 1)) / cols);
+    const nameFont = 'italic 500 ' + (cols >= 4 ? 30 : 38) + 'px ' + SERIF;
     // hauteur des noms (3 lignes max) puis cartes aussi hautes que possible, bloc centré verticalement
     ctx.font = nameFont;
     const nameA = asc(nameFont, 'É');
     const maxLines = Math.max(1, ...bottles.map((b) => wrap(ctx, b.name, cw - 6, 3).length));
     const namesH = 46 + nameA + (maxLines - 1) * nameA * 1.35 + 20;
     const avail = (H - 300) - y;
-    const ch = Math.max(360, Math.min(Math.round(cw * 2.4), avail - namesH));
-    y += Math.max(0, Math.round((avail - ch - namesH) / 2));
+    const ch = Math.max(rows > 1 ? 240 : 360, Math.min(Math.round(cw * 2.4), Math.floor((avail - rows * namesH - (rows - 1) * rowGap) / rows)));
+    const blockH = rows * (ch + namesH) + (rows - 1) * rowGap;
+    const y0 = y + Math.max(0, Math.round((avail - blockH) / 2));
     bottles.forEach((b, i) => {
-      const x = M + i * (cw + gap);
+      const row = Math.floor(i / cols), col = i % cols;
+      const inRow = row === rows - 1 ? n - cols * (rows - 1) : cols;   // dernière rangée centrée
+      const x = M + (maxW - (inRow * cw + (inRow - 1) * gap)) / 2 + col * (cw + gap);
+      const y = y0 + row * (ch + namesH + rowGap);
       // carte claire pour les photos sur fond blanc
       roundRect(ctx, x, y, cw, ch, 10);
       ctx.fillStyle = '#FBF8F1'; ctx.fill();
       ctx.strokeStyle = 'rgba(237,184,103,.6)'; ctx.lineWidth = 2; ctx.stroke();
       const img = photos[i];
-      if (img) {
+      if (img && img.width > 0 && img.height > 0) {
         const pad = 16;
         const sc = Math.min((cw - 2 * pad) / img.width, (ch - 2 * pad) / img.height);
         const iw = img.width * sc, ih = img.height * sc;

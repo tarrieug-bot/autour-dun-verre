@@ -396,7 +396,7 @@
         sec('Mon mot de la soirée', r.closing ? '« ' + esc(r.closing) + ' »' : none) +
         '<div class="recap-foot">' + sprig() + '<span class="label">' + (s.event.place ? esc(s.event.place.split('·')[0].trim()) + '<br>' : '') + 'Martinique</span></div>' +
         '</article>' +
-        '<article class="recap recap-bottles"><div class="label gold center">Les bouteilles de la soirée</div><div class="rb-grid">' +
+        '<article class="recap recap-bottles"><div class="label gold center">Les bouteilles de la soirée</div><div class="rb-grid" style="--n:' + (function (k) { return k <= 4 ? Math.max(1, k) : Math.ceil(k / 2); })((r.bottles || []).length) + '">' +
         (r.bottles || []).map((b, i) => '<div class="rb-item"><div class="rb-img">' + (b.image ? '<img src="' + esc(b.image) + '" alt="">' : '<span>' + (i + 1) + '</span>') + '<em>N° ' + (i + 1) + '</em></div><div class="rb-name">' + esc(b.name) + '</div></div>').join('') +
         '</div></article>';
       // Image story préparée à l’avance : le bouton partage immédiatement (exigence des téléphones)
