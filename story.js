@@ -180,12 +180,7 @@
         else text([s.event.subtitle.toUpperCase()], f.font, { tight: true });
         space(18, kh);
       }
-      const meta = [s.event.date, s.event.place].filter(Boolean).join(' · ').toUpperCase();
-      if (meta) {
-        const f = fitSpaced(meta, '400', ph(26), 5, maxW);
-        if (drawing) text([meta], f.font, { spacing: f.spacing, color: C.soft, tight: true }); else text([meta], f.font, { tight: true });
-        space(56, kh);
-      }
+      space(38, kh); // (date et lieu retirés : la date reste en pied de fiche)
       text([r.pseudo], 'italic 500 ' + ph(104) + 'px ' + SERIF, { tight: true });
       space(26, kh);
       text(['« ' + r.word + ' »'], 'italic 500 ' + ph(44) + 'px ' + SERIF, { color: C.accent2, tight: true });
